@@ -1,0 +1,386 @@
+/* ==========================================================================
+   COULEURS / VARIABLES / THEME CLAIR SOMBRE / PALETTE IVO
+   (couleurs de marque : navy #191A51, bleu accent #398CCB)
+
+   ⚠ --navy et --accent sont utilisés dans QUASIMENT TOUT ce fichier (bandeau,
+   boutons, pastilles, bordures actives...) — les changer ici change toute
+   l'appli d'un coup, c'est le but. MAIS ⚠ LIEN HORS CSS : la couleur du texte
+   écrit dans le PDF final (lib/pdf-fill.js, variable "navy" dans la fonction
+   fillAnnexe4, ligne avec "PDFLib.rgb(0.06, 0.1, 0.32)") est un navy très
+   proche mais codé en dur séparément (le PDF ne peut pas lire ce fichier CSS)
+   — si vous changez le navy de marque ici, pensez à ajuster aussi cette
+   valeur RGB dans pdf-fill.js pour rester cohérent visuellement.
+   ========================================================================== */
+:root{
+  --bg:#EFF3F8;
+  --surface:#FFFFFF;
+  --surface-2:#EDF1F6;
+  --text:#0F1B2A;
+  --text-muted:#5C6B7D;
+  --navy:#191A51;
+  --navy-strong:#101235;
+  --heading:#191A51;
+  --accent:#398CCB;
+  --blue-soft:#EAF4FB;
+  --blue-soft-border:#AED7EE;
+  --border:#D8E0E9;
+  --success:#2E7D5B;
+  --success-soft:#E3F1EA;
+  --danger:#B3452F;
+  --danger-soft:#FBEAE5;
+  --focus:#398CCB;
+  --bg-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000'%3E%3Cpolygon points='0,0 640,0 220,1000 -160,1000' fill='%23191A51' opacity='0.09'/%3E%3Cpolygon points='1600,0 960,0 1380,1000 1760,1000' fill='%23398CCB' opacity='0.11'/%3E%3Cg stroke='%237C8A9B' stroke-width='1.2' fill='none' opacity='0.35'%3E%3Cline x1='-60' y1='760' x2='340' y2='1040'/%3E%3Cline x1='1220' y1='-40' x2='1660' y2='240'/%3E%3C/g%3E%3C/svg%3E");
+  --shadow: 0 1px 2px rgba(16,24,38,.05), 0 8px 20px -10px rgba(16,24,38,.18);
+}
+/* --- MODE SOMBRE AUTOMATIQUE (dark mode, thème sombre système) --- */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0A121D;
+    --surface:#111B29;
+    --surface-2:#16233A;
+    --text:#E8EDF3;
+    --text-muted:#93A1B0;
+    --heading:#8FCBEC;
+    --accent:#398CCB;
+    --blue-soft:#141B3E;
+    --blue-soft-border:#33507A;
+    --border:#28394D;
+    --success:#6FBE97;
+    --success-soft:#173226;
+    --danger:#E08669;
+    --danger-soft:#331E17;
+    --focus:#8FCBEC;
+    --bg-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000'%3E%3Cpolygon points='0,0 640,0 220,1000 -160,1000' fill='%23398CCB' opacity='0.16'/%3E%3Cpolygon points='1600,0 960,0 1380,1000 1760,1000' fill='%23398CCB' opacity='0.13'/%3E%3Cg stroke='%23516480' stroke-width='1.2' fill='none' opacity='0.4'%3E%3Cline x1='-60' y1='760' x2='340' y2='1040'/%3E%3Cline x1='1220' y1='-40' x2='1660' y2='240'/%3E%3C/g%3E%3C/svg%3E");
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 20px -10px rgba(0,0,0,.5);
+  }
+}
+/* --- MODE SOMBRE FORCÉ (thème sombre choisi manuellement, data-theme="dark") --- */
+:root[data-theme="dark"]{
+  --bg:#0A121D;
+  --surface:#111B29;
+  --surface-2:#16233A;
+  --text:#E8EDF3;
+  --text-muted:#93A1B0;
+  --heading:#8FCBEC;
+  --accent:#398CCB;
+  --blue-soft:#141B3E;
+  --blue-soft-border:#33507A;
+  --border:#28394D;
+  --success:#6FBE97;
+  --success-soft:#173226;
+  --danger:#E08669;
+  --danger-soft:#331E17;
+  --focus:#8FCBEC;
+  --bg-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000'%3E%3Cpolygon points='0,0 640,0 220,1000 -160,1000' fill='%23398CCB' opacity='0.16'/%3E%3Cpolygon points='1600,0 960,0 1380,1000 1760,1000' fill='%23398CCB' opacity='0.13'/%3E%3Cg stroke='%23516480' stroke-width='1.2' fill='none' opacity='0.4'%3E%3Cline x1='-60' y1='760' x2='340' y2='1040'/%3E%3Cline x1='1220' y1='-40' x2='1660' y2='240'/%3E%3C/g%3E%3C/svg%3E");
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 20px -10px rgba(0,0,0,.5);
+}
+
+/* ==========================================================================
+   BASE PAGE / FOND D'ÉCRAN / FOND EN DIAGONALE / TYPOGRAPHIE GÉNÉRALE
+   ========================================================================== */
+*{box-sizing:border-box;}
+html,body{min-height:100%;}
+body{
+  background-color:var(--bg);
+  background-image:var(--bg-pattern);
+  background-size:cover;
+  background-position:center top;
+  background-attachment:fixed;
+  background-repeat:no-repeat;
+  color:var(--text);
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  padding:0;
+}
+h1,h2,h3,.display{
+  font-family:'Libre Franklin','Inter',sans-serif;
+  font-weight:700;
+  letter-spacing:-.01em;
+  text-wrap:balance;
+  color:var(--heading);
+}
+/* .wrap = conteneur centré (largeur max) de TOUTES les pages
+   ⚠ LIÉ À : le padding-top (22px) ci-dessous est aussi ce qui empêche le logo
+   du bandeau (.brand-badge, plus bas) de chevaucher le contenu quand il
+   déborde du bandeau — voir la note "⚠ LIÉ AU BANDEAU" sur .brand-badge.
+   Si vous réduisez ce padding-top, re-testez que "Paris"/le contenu de la
+   première étape ne touche plus le bas du logo. */
+.wrap{max-width:760px;margin:0 auto;padding:22px 16px 60px;}
+.tabular{font-variant-numeric:tabular-nums;}
+
+/* ==========================================================================
+   BANNIÈRE / EN-TÊTE / HEADER / TOPBAR / LOGO IVO / ENCOCHE BLEUE
+   (le bandeau navy tout en haut de chaque page, avec le logo qui déborde
+   et le triangle bleu clair — "l'encoche" — dans le coin droit)
+
+   ⚠ CES 3 RÈGLES SONT LIÉES ENTRE ELLES (#topbar, .topbar-inner, .brand-badge)
+   — ne changez JAMAIS une seule des trois sans vérifier les deux autres :
+     1. #topbar doit garder "overflow:visible" sinon le logo est coupé net
+        au lieu de déborder proprement au-dessus/en-dessous du bandeau.
+     2. .topbar-inner{height:60px} = la hauteur RÉELLE et VISIBLE du bandeau
+        navy. C'est CETTE valeur qui définit la hauteur du bandeau, pas
+        .brand-badge.
+     3. .brand-badge{height:92px} = la hauteur du LOGO, volontairement plus
+        grande que le bandeau (92 > 60) pour qu'il déborde ("effet logo qui
+        sort du cadre"). L'écart (92-60=32, donc 16px de débordement en haut
+        ET 16px en bas) doit rester inférieur au padding-top de .wrap
+        (22px, voir plus haut) sinon le logo chevauche le contenu de la page.
+     Aussi lié : le bandeau imprimé (règle "@media print" tout en bas de ce
+     fichier) redéfinit .brand-badge à 44px et #topbar en position statique —
+     si vous changez les valeurs normales ici, vérifiez si le bloc @media
+     print doit changer aussi.
+   ========================================================================== */
+#topbar{background:var(--navy);position:sticky;top:env(safe-area-inset-top,0px);z-index:10;box-shadow:0 2px 10px rgba(0,0,0,.18);overflow:visible;}
+/* #topbar::after = l'encoche / le triangle bleu clair en diagonale, coin haut-droit
+   (pas de lien de taille avec le logo — indépendant, juste décoratif) */
+#topbar::after{content:"";position:absolute;top:0;right:0;bottom:0;width:clamp(80px,15vw,240px);background:var(--accent);clip-path:polygon(100% 0, 100% 100%, 0 100%);}
+/* .topbar-inner height:60px = ⚠ LIÉ À .brand-badge height:92px (voir bloc au-dessus) */
+.topbar-inner{max-width:760px;margin:0 auto;height:60px;padding:0 16px;display:flex;align-items:center;gap:11px;position:relative;z-index:1;}
+/* .brand-badge = le cadre du logo IVO (celui qui déborde volontairement du bandeau)
+   ⚠ LIÉ À .topbar-inner height:60px ET à .wrap padding-top:22px (voir plus haut) */
+.brand-badge{height:92px;display:flex;align-items:center;flex-shrink:0;}
+/* l'image du logo elle-même : ⚠ LIÉE au fichier assets/logo-ivo-white.png —
+   ce même chemin est répété dans 4 fichiers (index.html racine, client/index.html,
+   lib/conseiller-app.js et espace-client/index.html, tous via renderTopbar()) ;
+   si vous renommez ou déplacez ce fichier PNG, mettez à jour les 4 endroits. */
+.brand-badge img{height:100%;width:auto;display:block;}
+.brand-badge span{color:#fff;font-family:'Libre Franklin',sans-serif;font-weight:800;font-size:13.5px;letter-spacing:.02em;}
+/* .brand-context = le petit texte à droite du logo ("Connaissance client", "Espace conseiller", "Espace client") */
+.brand-context{padding-left:14px;margin-left:14px;border-left:1px solid rgba(255,255,255,.25);}
+.brand-name{font-family:'Libre Franklin',sans-serif;font-weight:700;font-size:14.5px;color:#fff;line-height:1.2;}
+.brand-sub{font-size:10.5px;letter-spacing:.13em;color:rgba(255,255,255,.75);text-transform:uppercase;font-weight:600;}
+
+/* ==========================================================================
+   BARRE DE PROGRESSION / ÉTAPES / PASTILLES DU QUESTIONNAIRE
+   (les ronds numérotés 1-8 en haut du questionnaire client)
+   ========================================================================== */
+.progress{display:flex;gap:4px;margin-bottom:30px;overflow-x:auto;padding-bottom:4px;}
+.progress::-webkit-scrollbar{height:0;}
+.pstep{
+  flex:1;min-width:64px;text-align:center;cursor:pointer;border:none;background:none;
+  padding:0;display:flex;flex-direction:column;align-items:center;gap:6px;
+}
+/* .pdot = la pastille ronde elle-même (grise = à faire, navy = en cours, verte = fait) */
+.pdot{width:26px;height:26px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text-muted);background:var(--surface);transition:all .15s ease;}
+.pstep.active .pdot{border-color:var(--navy);background:var(--navy);color:#fff;}
+.pstep.done .pdot{border-color:var(--success);background:var(--success);color:#fff;}
+.plabel{font-size:10px;color:var(--text-muted);line-height:1.2;max-width:70px;}
+.pstep.active .plabel{color:var(--heading);font-weight:600;}
+.pbar-track{height:3px;background:var(--border);border-radius:3px;margin:-19px 0 0;position:relative;z-index:-1;}
+.pbar-fill{height:3px;background:var(--navy);border-radius:3px;transition:width .2s ease;}
+
+/* ==========================================================================
+   CARTE / CARD BLANCHE / BLOC PRINCIPAL / ENCADRÉ DE CONTENU
+   (le grand bloc blanc arrondi qui contient chaque étape/écran)
+   ========================================================================== */
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:26px 24px;box-shadow:var(--shadow);
+}
+/* .eyebrow = le petit texte bleu en majuscules au-dessus du titre */
+.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:6px;}
+.step-title{font-size:23px;margin:0 0 8px;}
+.step-intro{color:var(--text-muted);font-size:14.5px;line-height:1.55;margin:0 0 24px;}
+
+/* ==========================================================================
+   CHAMPS DE FORMULAIRE / INPUTS / LABELS / SAISIE
+   ========================================================================== */
+.field{margin-bottom:20px;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media (max-width:520px){.field-row{grid-template-columns:1fr;}}
+label.flabel{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--text);}
+label.flabel .opt{color:var(--text-muted);font-weight:400;}
+input[type=text],input[type=number],input[type=email],input[type=tel],input[type=date],select,textarea{
+  width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:5px;
+  background:var(--surface);color:var(--text);font-size:14px;font-family:inherit;
+}
+textarea{resize:vertical;min-height:64px;}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus);}
+.suffix-wrap{position:relative;}
+.suffix-wrap input{padding-right:38px;}
+/* .suffix = le petit texte "€", "%", etc. collé à droite d'un champ */
+.suffix{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:12.5px;color:var(--text-muted);font-weight:600;}
+
+/* ==========================================================================
+   ENCART D'INFO / BULLE D'AIDE / TOOLTIP BLEU
+   ========================================================================== */
+.info{
+  display:flex;gap:9px;background:var(--blue-soft);border-left:3px solid var(--navy);
+  border-radius:4px;padding:10px 12px;margin-top:8px;font-size:12.5px;color:var(--text-muted);line-height:1.5;
+}
+.info b{color:var(--text);}
+.info .ic{flex-shrink:0;font-size:13px;}
+
+/* ==========================================================================
+   CHIPS / PASTILLES DE CHOIX / BOUTONS RONDS DE SÉLECTION
+   ========================================================================== */
+.chips{display:flex;gap:8px;flex-wrap:wrap;}
+.chip{
+  padding:8px 15px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);
+  font-size:13.5px;font-weight:600;cursor:pointer;color:var(--text);transition:all .12s ease;
+}
+.chip:hover{border-color:var(--navy);}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff;}
+
+/* ==========================================================================
+   CARTES DE CHOIX / OPTIONS À COCHER / OPTCARD
+   (ex : profil de perte max, personne physique/morale, etc.)
+   ========================================================================== */
+.optcard{
+  border:1.5px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:10px;cursor:pointer;
+  transition:all .12s ease;background:var(--surface);
+}
+.optcard:hover{border-color:var(--navy);}
+.optcard.on{border-color:var(--heading);background:var(--blue-soft);box-shadow:0 0 0 1px var(--heading) inset;}
+.optcard .ot{font-weight:700;font-size:14px;margin-bottom:2px;}
+.optcard .od{font-size:12.5px;color:var(--text-muted);line-height:1.4;}
+
+/* ==========================================================================
+   TABLEAU DES INSTRUMENTS FINANCIERS / CONNAISSANCE PRODUITS / QUIZ AMF
+   (étape "Vos connaissances et votre expérience" du questionnaire)
+   ========================================================================== */
+.instr{border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:8px;}
+.irow{padding:14px 16px;border-bottom:1px solid var(--border);}
+.irow:last-child{border-bottom:none;}
+.iname{font-weight:700;font-size:14px;margin-bottom:10px;}
+.idesc{font-size:12px;color:var(--text-muted);margin-bottom:10px;}
+.icontrols{display:flex;gap:16px;flex-wrap:wrap;align-items:center;}
+.iyn{display:flex;gap:6px;}
+.iyn button{padding:5px 12px;font-size:12.5px;font-weight:600;border-radius:4px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;}
+.iyn button.on{background:var(--navy);border-color:var(--navy);color:#fff;}
+.iops{display:flex;gap:6px;}
+.iops button{padding:5px 10px;font-size:11.5px;font-weight:600;border-radius:4px;border:1.5px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;}
+.iops button.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+.iops-label{font-size:11px;color:var(--text-muted);margin-right:2px;}
+
+/* --- QUIZ AMF (mini quiz affiché quand le client dit "je connais") --- */
+.iquiz{margin-top:12px;padding:12px 14px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);}
+.iquiz-q{font-size:12.5px;font-weight:600;margin-bottom:10px;}
+.iquiz-opts{display:flex;flex-direction:column;gap:6px;}
+.iquiz-opts button{text-align:left;padding:8px 12px;font-size:12.5px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;}
+.iquiz-opts button:hover:not(:disabled){border-color:var(--navy);}
+.iquiz-opts button:disabled{cursor:default;opacity:.7;}
+.iquiz-opts button.picked-correct{border-color:var(--success);background:var(--success-soft);color:var(--success);opacity:1;font-weight:600;}
+.iquiz-opts button.picked-wrong{border-color:var(--danger);background:var(--danger-soft);color:var(--danger);opacity:1;}
+.iquiz-feedback{font-size:12px;margin-top:10px;line-height:1.5;}
+.iquiz-feedback.ok{color:var(--success);font-weight:600;}
+.iquiz-feedback.ko{color:var(--text-muted);}
+
+/* ==========================================================================
+   CLASSEMENT / DRAG AND DROP / GLISSER-DÉPOSER DES OBJECTIFS
+   (étape "Vos objectifs et votre horizon", liste réordonnable à la souris/au doigt)
+   ========================================================================== */
+.ranklist{display:flex;flex-direction:column;gap:8px;}
+.rankitem{display:flex;align-items:center;gap:12px;background:var(--blue-soft);border:1px solid var(--blue-soft-border);border-radius:5px;padding:10px 12px;position:relative;}
+.rankitem.dragging{z-index:20;box-shadow:0 8px 20px -6px rgba(16,24,38,.35);cursor:grabbing;}
+.rankitem.rank-shifting{transition:transform .15s ease;}
+/* .rankhandle = la poignée ⠿ pour glisser une ligne */
+.rankhandle{cursor:grab;touch-action:none;color:var(--text-muted);font-size:16px;line-height:1;flex-shrink:0;padding:4px 2px;user-select:none;}
+.rankhandle:hover{color:var(--heading);}
+.rankhandle-inline{font-size:13px;}
+.ranknum{width:24px;height:24px;border-radius:50%;background:var(--navy);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ranktext{flex:1;font-size:13.5px;font-weight:600;}
+.rankbtns{display:flex;gap:4px;}
+.rankbtns button{width:26px;height:26px;border-radius:4px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px;}
+.rankbtns button:disabled{opacity:.3;cursor:default;}
+
+/* ==========================================================================
+   PASTILLE STATISTIQUE / STAT TILE
+   ========================================================================== */
+.stattile{display:flex;justify-content:space-between;align-items:center;background:var(--blue-soft);border:1px solid var(--blue-soft-border);border-radius:6px;padding:14px 16px;margin:18px 0 6px;}
+.stattile .sl{font-size:12.5px;color:var(--text-muted);font-weight:600;}
+.stattile .sv{font-size:20px;font-weight:800;color:var(--heading);}
+.stattile .sv small{font-size:12px;color:var(--text-muted);font-weight:600;}
+
+/* ==========================================================================
+   BOUTONS / BTN / NAVIGATION SUIVANT-PRÉCÉDENT
+   ========================================================================== */
+.navrow{display:flex;justify-content:space-between;align-items:center;margin-top:28px;gap:10px;}
+.btn{padding:11px 22px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;border:none;font-family:inherit;}
+.btn-primary{background:var(--navy);color:#fff;}
+.btn-primary:hover{background:var(--navy-strong);}
+.btn-ghost{background:none;color:var(--text-muted);border:1.5px solid var(--border);}
+.btn-ghost:hover{color:var(--text);border-color:var(--text-muted);}
+.btn-gold{background:var(--accent);color:#fff;}
+.btn-gold:hover{opacity:.88;}
+.btn:disabled{opacity:.45;cursor:default;}
+
+/* ==========================================================================
+   ÉCRAN D'INTRODUCTION / ACCUEIL DU QUESTIONNAIRE / LISTE À PUCES NUMÉROTÉES
+   ========================================================================== */
+.intro-list{display:flex;flex-direction:column;gap:10px;margin:20px 0 26px;}
+.intro-item{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;color:var(--text-muted);}
+.intro-item .n{width:22px;height:22px;border-radius:50%;background:var(--blue-soft);color:var(--heading);font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.pill{display:inline-flex;align-items:center;gap:6px;background:var(--blue-soft);border:1px solid var(--blue-soft-border);border-radius:5px;padding:5px 12px;font-size:11.5px;font-weight:600;color:var(--text-muted);}
+
+/* ==========================================================================
+   RÉCAPITULATIF FINAL / RECAP / TABLEAU DE SYNTHÈSE / PROFIL DE RISQUE
+   (dernière étape du questionnaire client, avant envoi)
+   ========================================================================== */
+.recap-sec{border:1px solid var(--border);border-radius:6px;margin-bottom:14px;overflow:hidden;}
+.recap-head{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;background:var(--blue-soft);cursor:pointer;}
+.recap-head h3{font-size:14px;margin:0;}
+.recap-head a{font-size:12px;color:var(--heading);font-weight:700;text-decoration:none;}
+.recap-body{padding:14px 16px;font-size:13px;line-height:1.7;}
+.recap-body table{width:100%;border-collapse:collapse;}
+.recap-body td{padding:3px 0;font-size:13px;vertical-align:top;}
+.recap-body td.k{color:var(--text-muted);width:52%;}
+.recap-body td.v{font-weight:600;text-align:right;}
+.kdiv{overflow-x:auto;}
+
+/* --- CARTE PROFIL DE RISQUE (prudent / équilibré / dynamique / discrétionnaire) --- */
+.profilecard{border-radius:6px;padding:20px;margin:6px 0 18px;border:1.5px solid var(--blue-soft-border);background:var(--blue-soft);}
+.profilecard .pname{font-family:'Libre Franklin',sans-serif;font-weight:800;font-size:19px;color:var(--heading);margin-bottom:6px;}
+.profilecard p{font-size:13px;color:var(--text);line-height:1.55;margin:0;}
+.disclaimer{font-size:11.5px;color:var(--text-muted);margin-top:10px;font-style:italic;}
+
+/* --- CASE À COCHER FINALE (certification / consentement) --- */
+.checkline{display:flex;gap:10px;align-items:flex-start;background:var(--surface-2);border-radius:5px;padding:12px 14px;margin:18px 0;font-size:13px;line-height:1.5;}
+.checkline input{margin-top:2px;}
+
+/* ==========================================================================
+   NOTIFICATION / TOAST / MESSAGE FLASH EN BAS D'ÉCRAN
+   ========================================================================== */
+.actionrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy-strong);color:#fff;padding:11px 18px;border-radius:6px;font-size:13px;font-weight:600;box-shadow:var(--shadow);z-index:50;opacity:0;transition:opacity .2s ease;pointer-events:none;}
+.toast.show{opacity:1;}
+/* --- BANDEAU D'ALERTE ROUGE (erreur bloquante) --- */
+.banner-warn{background:var(--danger-soft);border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:12px 14px;font-size:12.5px;margin-bottom:18px;}
+.banner-warn a{color:var(--danger);font-weight:700;text-decoration:underline;}
+
+/* ==========================================================================
+   ENCART CONSEILLER (repliable) / PARTIE ADVISOR CÔTÉ QUESTIONNAIRE CLIENT
+   ========================================================================== */
+.advisor-box{margin-top:16px;}
+.advisor-toggle{background:none;border:none;color:var(--text-muted);font-size:12px;font-weight:600;cursor:pointer;padding:6px 2px;font-family:inherit;}
+.advisor-toggle:hover{color:var(--heading);}
+.advisor-panel{border:1px dashed var(--border);border-radius:6px;padding:16px;margin-top:8px;background:var(--surface-2);}
+.advisor-note{font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.5;}
+.advisor-link{font-size:11.5px;color:var(--text-muted);word-break:break-all;margin-top:10px;font-family:monospace;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;}
+
+/* ==========================================================================
+   BLOC FINAL D'ENVOI / FINALBOX / BOUTON DE VALIDATION DU DOSSIER
+   ========================================================================== */
+.finalbox{border:1.5px solid var(--blue-soft-border);background:var(--blue-soft);border-radius:8px;padding:20px;margin-top:22px;text-align:center;}
+.finalbox-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:6px;}
+.finalbox-text{font-size:13px;color:var(--text-muted);line-height:1.5;margin:0 0 16px;max-width:440px;margin-left:auto;margin-right:auto;}
+.btn-large{padding:14px 28px;font-size:15px;width:100%;max-width:420px;}
+.finalbox-hint{font-size:12px;color:var(--danger);margin-top:10px;font-weight:600;}
+.actionrow-secondary{justify-content:center;margin-top:14px;}
+
+/* ==========================================================================
+   IMPRESSION / EXPORT PDF NAVIGATEUR / MODE PRINT
+   (règles appliquées UNIQUEMENT quand la page est imprimée / exportée en PDF
+   depuis le navigateur — jamais à l'écran normal)
+
+   ⚠ LIÉ À la section BANNIÈRE/TOPBAR/LOGO tout en haut de ce fichier — ce
+   bloc ANNULE volontairement le débordement du logo (overflow:visible →
+   hidden, position:sticky → static) pour éviter qu'il ne se répète en petit
+   bloc cassé sur chaque page imprimée. Si vous changez la hauteur normale du
+   bandeau/logo là-haut, ce n'est PAS nécessaire de changer les valeurs
+   ci-dessous (44px reste une taille raisonnable à l'impression), mais gardez
+   ce bloc si vous retirez l'effet de débordement — sinon il ne sert plus à rien.
+   ========================================================================== */
+@media print{
+  #topbar{position:static;overflow:hidden;}
+  .brand-badge{height:44px;}
+}

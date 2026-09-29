@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Interface conseiller — IVO Capital Partners</title>
+<link rel="stylesheet" href="../lib/ivo-theme.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Libre+Franklin:wght@600;700;800&display=swap">
+<style>
+.wrap{max-width:920px;}
+.card{max-width:420px;margin:60px auto;}
+.card.wide{max-width:100%;}
+.login-field{margin-bottom:16px;}
+.topbar-user{margin-left:auto;display:flex;align-items:center;gap:10px;position:relative;z-index:1;}
+.topbar-user span{color:rgba(255,255,255,.85);font-size:12.5px;}
+.topbar-user button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:12px;font-weight:600;padding:6px 12px;border-radius:5px;cursor:pointer;}
+.topbar-user button:hover{background:rgba(255,255,255,.22);}
+
+.subrow{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
+.sublist{display:flex;flex-direction:column;gap:10px;}
+.subitem{border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--surface);cursor:pointer;transition:border-color .12s ease;}
+.subitem:hover{border-color:var(--navy);}
+.subitem-name{font-weight:700;font-size:14px;}
+.subitem-meta{font-size:12px;color:var(--text-muted);margin-top:2px;}
+.badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap;}
+.badge-recu{background:var(--blue-soft);color:var(--heading);border:1px solid var(--blue-soft-border);}
+.badge-complete{background:var(--success-soft);color:var(--success);border:1px solid var(--success);}
+.badge-encours{background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);}
+.badge-danger{background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger);}
+.empty-state{text-align:center;padding:50px 20px;color:var(--text-muted);font-size:13.5px;}
+
+/* --- CARTES STATISTIQUES DU TABLEAU DE BORD (⚠ LIÉ À renderDashboard() dans
+   lib/conseiller-app.js, qui génère .statgrid3/.statcard) --- */
+.statgrid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:20px;}
+@media (max-width:640px){.statgrid3{grid-template-columns:1fr;}}
+.statcard{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;box-shadow:var(--shadow);}
+.statcard.warn{border-color:var(--danger);background:var(--danger-soft);}
+.sc-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:8px;}
+.statcard.warn .sc-label{color:var(--danger);}
+.sc-value{font-family:'Libre Franklin',sans-serif;font-weight:800;font-size:26px;color:var(--heading);}
+.statcard.warn .sc-value{color:var(--danger);}
+
+.dropzone{border:1.5px dashed var(--border);background:var(--surface-2);transition:border-color .15s ease,background .15s ease;}
+.dropzone.drag-over{border-color:var(--navy);background:var(--blue-soft);}
+.import-row{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
+.import-title{font-weight:700;font-size:13.5px;margin-bottom:3px;}
+.import-sub{font-size:12px;color:var(--text-muted);line-height:1.5;max-width:520px;}
+
+.section-title{font-size:15px;font-weight:800;color:var(--heading);margin:30px 0 4px;padding-top:22px;border-top:1px solid var(--border);}
+.section-title:first-child{margin-top:0;padding-top:0;border-top:none;}
+.section-sub{font-size:12.5px;color:var(--text-muted);margin:0 0 16px;}
+.readonly-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 24px;font-size:13px;}
+@media (max-width:640px){.readonly-grid{grid-template-columns:1fr;}}
+.readonly-grid .k{color:var(--text-muted);padding:5px 0;}
+.readonly-grid .v{font-weight:600;text-align:right;padding:5px 0;}
+@media (max-width:640px){.readonly-grid .v{text-align:left;margin-bottom:6px;}}
+
+.aml-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border);}
+.aml-row:last-child{border-bottom:none;}
+.aml-label{font-size:12.5px;line-height:1.4;flex:1;}
+.aml-yn{display:flex;gap:6px;flex-shrink:0;}
+.aml-yn button{padding:5px 12px;font-size:12px;font-weight:600;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;}
+.aml-yn button.on-oui{background:var(--danger);border-color:var(--danger);color:#fff;}
+.aml-yn button.on-non{background:var(--success);border-color:var(--success);color:#fff;}
+
+.preco-item{border:1.5px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:10px;}
+.preco-item.on{border-color:var(--navy);background:var(--blue-soft);}
+.preco-head{display:flex;align-items:center;gap:10px;cursor:pointer;}
+.preco-head input{width:16px;height:16px;}
+.preco-head span{font-weight:700;font-size:13.5px;}
+.preco-item textarea{margin-top:10px;}
+
+.backlink{background:none;border:none;color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;padding:0;margin-bottom:16px;display:inline-flex;align-items:center;gap:5px;}
+.backlink:hover{color:var(--heading);}
+.err-box{background:var(--danger-soft);border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:10px 12px;font-size:12.5px;margin-top:12px;}
+
+.tabrow{display:flex;flex-wrap:wrap;gap:10px 26px;border-bottom:1px solid var(--border);margin:22px 0 20px;}
+.tabbtn{cursor:pointer;border:none;background:none;font-family:inherit;padding:10px 2px;font-size:13.5px;font-weight:700;border-bottom:2.5px solid transparent;color:var(--text-muted);}
+.tabbtn.on{color:var(--heading);border-bottom-color:var(--accent);}
+.docrow-actions{display:flex;gap:8px;flex-shrink:0;}
+.doc-uploadbox{border:1.5px dashed var(--border);border-radius:6px;padding:14px 16px;margin-bottom:10px;background:var(--surface-2);display:flex;align-items:center;gap:14px;}
+.link-account-box{border:1px dashed var(--border);border-radius:6px;padding:14px 16px;margin-top:6px;background:var(--surface-2);}
+.link-account-box input{margin-top:8px;}
+</style>
+</head>
+<body>
+
+<div id="topbar"></div>
+<div class="wrap" id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="../lib/pdf-fill.js"></script>
+<script src="../client/config.js"></script>
+<script src="../lib/conseiller-app.js"></script>
+</body>
+</html>
