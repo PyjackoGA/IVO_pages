@@ -5,7 +5,7 @@
    Ne JAMAIS mettre ici la clé "service_role" de Supabase ni la clé Resend.
    ========================================================================== */
 window.IVO_CONFIG = {
-  SUPABASE_URL: "https://iyirjeosbznjygqbkmhk.supabase.co/rest/v1/",
+  SUPABASE_URL: "https://iyirjeosbznjygqbkmhk.supabase.co",
   SUPABASE_ANON_KEY: "sb_publishable_mFre-9OGy4h32Gsg7BaDog_l84I8aUL",
 
   ADVISORS: [
