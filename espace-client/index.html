@@ -67,19 +67,45 @@
 "use strict";
 
 /* --- TYPES DE DOCUMENTS PERSONNELS / PIÈCES JUSTIFICATIVES CLIENT
-   ⚠ TRIPLE LIEN — ces 4 clés doivent rester identiques à :
+   ⚠ TRIPLE LIEN — ces clés doivent rester identiques à :
      1. le même tableau DOC_TYPES dans lib/conseiller-app.js (partie conseiller) ;
      2. la contrainte SQL "doc_type in (...)" de client_documents
-        (supabase/schema-v2-portail-client.sql).
+        (supabase/schema-v2-portail-client.sql, section 8).
    Ajouter un type ici sans le faire aux 2 autres endroits fait échouer
    l'envoi du document (rejeté par la base) ou casse l'affichage du libellé
-   côté conseiller. --- */
+   côté conseiller.
+
+   ⚠ Cette liste contient TOUS les documents possibles, mais un client donné
+   n'en voit qu'une partie — voir requestedDocTypes() juste en dessous, qui
+   filtre selon appState.submission.requested_docs (choisi par le conseiller,
+   encart "Documents demandés" du Dossier KYC). --- */
 var DOC_TYPES = [
   {key:"cni", label:"Carte d'identité"},
   {key:"justificatif_domicile", label:"Justificatif de domicile"},
   {key:"rib", label:"RIB"},
+  {key:"preuve_origine_fonds", label:"Preuve d'origine des fonds"},
+  {key:"kyc", label:"KYC"},
+  {key:"numero_fiscal", label:"Numéro fiscal"},
+  {key:"diligence_lcbft", label:"Diligence LCB-FT"},
+  {key:"esg_anciens_clients", label:"Questionnaire ESG (anciens clients)"},
+  {key:"statuts", label:"Statuts"},
+  {key:"kbis_rcs", label:"K-Bis / RCS"},
+  {key:"rbe", label:"RBE (registre des bénéficiaires effectifs)"},
+  {key:"id_jdd_beneficiaires", label:"ID + justificatif de domicile des bénéficiaires effectifs"},
+  {key:"bilan", label:"Bilan"},
+  {key:"diligence_lcbft_beneficiaire", label:"Diligence LCB-FT (bénéficiaire effectif)"},
   {key:"justificatif_revenus", label:"Justificatif de revenus"},
+  {key:"autre", label:"Autre document"},
 ];
+
+/* Sous-ensemble de DOC_TYPES réellement demandé à CE client (appState.submission
+   .requested_docs) — c'est CETTE fonction qu'il faut utiliser pour décider quoi
+   afficher, jamais DOC_TYPES directement (qui liste TOUS les documents possibles,
+   tous clients confondus). */
+function requestedDocTypes(){
+  var keys = (appState.submission && appState.submission.requested_docs) || [];
+  return DOC_TYPES.filter(function(t){ return keys.indexOf(t.key) > -1; });
+}
 
 function esc(s){ return (s||"").toString().replace(/[&<>"']/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
 function fmtDateTime(iso){ try{ return new Date(iso).toLocaleString('fr-FR'); }catch(e){ return iso; } }
@@ -173,7 +199,8 @@ function latestDocByType(type){
 
 function renderDashboard(){
   var sub = appState.submission;
-  var validCount = DOC_TYPES.filter(function(t){ var d = latestDocByType(t.key); return d && d.status==="valide"; }).length;
+  var myDocTypes = requestedDocTypes();
+  var validCount = myDocTypes.filter(function(t){ var d = latestDocByType(t.key); return d && d.status==="valide"; }).length;
   var lastReport = appState.reports.length ? appState.reports[0] : null;
 
   /* ⚠ Le bouton "Actualiser" est nécessaire car il n'y a pas de mise à jour
@@ -191,18 +218,21 @@ function renderDashboard(){
     html += '<p class="step-intro">Voici un aperçu de votre dossier chez IVO Capital Partners.</p>';
     html += '<div class="statgrid">' +
       '<div class="stattile2"><div class="l">Dossier KYC</div><div class="v" style="font-size:14px">'+ (sub.status==="complete" ? '<span class="badge badge-complete">Complété</span>' : '<span class="badge badge-recu">En cours</span>') +'</div></div>' +
-      '<div class="stattile2"><div class="l">Documents fournis</div><div class="v">'+validCount+' <small style="font-size:12px;color:var(--text-muted)">/ '+DOC_TYPES.length+'</small></div></div>' +
+      '<div class="stattile2"><div class="l">Documents fournis</div><div class="v">'+validCount+' <small style="font-size:12px;color:var(--text-muted)">/ '+myDocTypes.length+'</small></div></div>' +
       '<div class="stattile2"><div class="l">Dernier bilan reçu</div><div class="v" style="font-size:15px">'+(lastReport?esc(fmtDateTime(lastReport.sent_at)):'—')+'</div></div>' +
     '</div>';
-    if(validCount < DOC_TYPES.length){
+    if(myDocTypes.length && validCount < myDocTypes.length){
       html += '<div class="info"><span class="ic">ℹ️</span><div>Il vous reste des documents à transmettre pour finaliser votre dossier. <a href="#" data-action="goDocuments" style="color:var(--heading);font-weight:700">Voir mes documents</a></div></div>';
     }
   } else if(appState.tab==="documents"){
     html += '<h1 class="step-title" style="margin-bottom:4px">Mes documents</h1>';
     html += '<p class="section-sub">Transmettez vos justificatifs, votre conseiller les valide directement.</p>';
     if(appState.uploadError) html += '<div class="err-box">'+esc(appState.uploadError)+'</div>';
+    if(!myDocTypes.length){
+      html += '<div class="empty-state">Aucun document à transmettre pour l\'instant — votre conseiller vous préviendra si besoin.</div>';
+    }
     html += '<div class="sublist">';
-    DOC_TYPES.forEach(function(t){
+    myDocTypes.forEach(function(t){
       var d = latestDocByType(t.key);
       html += '<div class="subitem'+(!d?' dashed':'')+'">' +
         '<div><div class="subitem-name" style="font-weight:700;font-size:14px">'+esc(t.label)+'</div>' +
