@@ -34,8 +34,17 @@
 .section-title:first-child{margin-top:0;padding-top:0;border-top:none;}
 .section-sub{font-size:12.5px;color:var(--text-muted);margin:0 0 16px;}
 
-.subitem{border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--surface);}
+/* ⚠ ALIGNEMENT DES 3 COLONNES (nom / statut / bouton) : le premier enfant de
+   .subitem (bloc nom+fichier) prend TOUT l'espace restant ("flex:1"), ce qui
+   pousse systématiquement le badge et le bouton au même endroit sur chaque
+   ligne, quelle que soit la longueur du nom ou du texte du badge — sans ça
+   (ancien "justify-content:space-between"), le badge se décalait ligne par
+   ligne selon la largeur du texte qui le précède. */
+.subitem{border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px;background:var(--surface);}
 .subitem.dashed{border-style:dashed;}
+.subitem>div:first-child{flex:1 1 auto;min-width:0;}
+.subitem .badge{flex-shrink:0;min-width:180px;text-align:center;}
+.subitem .btn{flex-shrink:0;min-width:130px;text-align:center;}
 .sublist{display:flex;flex-direction:column;gap:10px;}
 .btn{padding:9px 16px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;border:none;font-family:inherit;}
 .btn-primary{background:var(--navy);color:#fff;}
