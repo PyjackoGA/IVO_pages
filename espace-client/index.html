@@ -24,7 +24,7 @@
 .badge-encours{background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);}
 .badge-danger{background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger);}
 
-.statgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:22px;}
+.statgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:22px;}
 @media (max-width:640px){.statgrid{grid-template-columns:1fr;}}
 .stattile2{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;box-shadow:var(--shadow);}
 .stattile2 .l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:10px;}
@@ -77,7 +77,7 @@
 
    ⚠ Cette liste contient TOUS les documents possibles, mais un client donné
    n'en voit qu'une partie — voir requestedDocTypes() juste en dessous, qui
-   filtre selon appState.submission.requested_docs (choisi par le conseiller,
+   filtre selon appState.account.requested_docs (choisi par le conseiller,
    encart "Documents demandés" du Dossier KYC). --- */
 var DOC_TYPES = [
   {key:"cni", label:"Carte d'identité"},
@@ -98,13 +98,22 @@ var DOC_TYPES = [
   {key:"autre", label:"Autre document"},
 ];
 
-/* Sous-ensemble de DOC_TYPES réellement demandé à CE client (appState.submission
-   .requested_docs) — c'est CETTE fonction qu'il faut utiliser pour décider quoi
-   afficher, jamais DOC_TYPES directement (qui liste TOUS les documents possibles,
-   tous clients confondus). */
+/* Sous-ensemble de DOC_TYPES réellement demandé à CE client (appState.account
+   .requested_docs, la ligne "profiles" du compte) — c'est CETTE fonction
+   qu'il faut utiliser pour décider quoi afficher, jamais DOC_TYPES
+   directement (qui liste TOUS les documents possibles, tous clients
+   confondus). ⚠ Indépendant de tout dossier KYC — voir
+   supabase/schema-v2-portail-client.sql section 9. */
 function requestedDocTypes(){
-  var keys = (appState.submission && appState.submission.requested_docs) || [];
+  var keys = (appState.account && appState.account.requested_docs) || [];
   return DOC_TYPES.filter(function(t){ return keys.indexOf(t.key) > -1; });
+}
+
+/* Nom d'affichage du compte selon son type (mêmes règles que
+   accountDisplayName() de lib/conseiller-app.js). */
+function accountDisplayName(p){
+  if(!p) return "";
+  return p.person_type==="morale" ? (p.denomination||"") : ((p.prenom||"")+" "+(p.nom||"")).trim();
 }
 
 function esc(s){ return (s||"").toString().replace(/[&<>"']/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
@@ -124,7 +133,7 @@ function getClient(){
 var appState = {
   view: "loading", // loading | login | noaccount | dashboard
   session: null,
-  submission: null,
+  account: null, // ligne "profiles" du compte connecté — indépendant de tout dossier KYC
   documents: [],
   reports: [],
   tab: "dashboard", // dashboard | documents | bilans
@@ -178,8 +187,8 @@ function renderLogin(){
 function renderNoAccount(){
   return '<div class="card">' +
     '<div class="eyebrow">Espace client</div>' +
-    '<h1 class="step-title">Aucun dossier relié</h1>' +
-    '<p class="step-intro">Votre compte est bien connecté, mais aucun dossier de connaissance client ne lui est encore rattaché. Contactez votre conseiller IVO Capital Partners.</p>' +
+    '<h1 class="step-title">Compte introuvable</h1>' +
+    '<p class="step-intro">Votre connexion a réussi, mais aucun compte client ne correspond. Contactez votre conseiller IVO Capital Partners.</p>' +
   '</div>';
 }
 
@@ -198,7 +207,7 @@ function latestDocByType(type){
 }
 
 function renderDashboard(){
-  var sub = appState.submission;
+  var acc = appState.account;
   var myDocTypes = requestedDocTypes();
   var validCount = myDocTypes.filter(function(t){ var d = latestDocByType(t.key); return d && d.status==="valide"; }).length;
   var lastReport = appState.reports.length ? appState.reports[0] : null;
@@ -214,10 +223,9 @@ function renderDashboard(){
 
   if(appState.tab==="dashboard"){
     html += '<div class="eyebrow">Bonjour</div>';
-    html += '<h1 class="step-title">'+esc(sub.client_name||"")+'</h1>';
-    html += '<p class="step-intro">Voici un aperçu de votre dossier chez IVO Capital Partners.</p>';
+    html += '<h1 class="step-title">'+esc(accountDisplayName(acc)||"")+'</h1>';
+    html += '<p class="step-intro">Voici un aperçu de votre espace chez IVO Capital Partners.</p>';
     html += '<div class="statgrid">' +
-      '<div class="stattile2"><div class="l">Dossier KYC</div><div class="v" style="font-size:14px">'+ (sub.status==="complete" ? '<span class="badge badge-complete">Complété</span>' : '<span class="badge badge-recu">En cours</span>') +'</div></div>' +
       '<div class="stattile2"><div class="l">Documents fournis</div><div class="v">'+validCount+' <small style="font-size:12px;color:var(--text-muted)">/ '+myDocTypes.length+'</small></div></div>' +
       '<div class="stattile2"><div class="l">Dernier bilan reçu</div><div class="v" style="font-size:15px">'+(lastReport?esc(fmtDateTime(lastReport.sent_at)):'—')+'</div></div>' +
     '</div>';
@@ -293,22 +301,21 @@ async function init(){
   }
 }
 
-/* ⚠ LIÉ À la fonction linkAccount() de lib/conseiller-app.js : c'est LÀ-BAS
-   (côté conseiller) que la colonne "client_user_id" utilisée juste en dessous
-   est renseignée pour la première fois — tant qu'un conseiller n'a pas fait
-   cette liaison, cette requête ne renverra jamais rien (vue "noaccount"). */
+/* ⚠ Le compte est sa ligne "profiles" (role='client'), indépendante de tout
+   dossier KYC — voir supabase/schema-v2-portail-client.sql section 9 et
+   lib/conseiller-app.js (createNewClientFromScratch()) côté conseiller. */
 async function loadEverything(){
   var client = getClient();
   var uid = appState.session.user.id;
-  var { data: subs, error } = await client.from("submissions").select("*").eq("client_user_id", uid).limit(1);
+  var { data: profile, error } = await client.from("profiles").select("*").eq("id", uid).maybeSingle();
   if(error){ appState.loadError = error.message; appState.view = "dashboard"; return; }
-  if(!subs || !subs.length){ appState.view = "noaccount"; return; }
-  appState.submission = subs[0];
+  if(!profile){ appState.view = "noaccount"; return; }
+  appState.account = profile;
   appState.view = "dashboard";
 
   var [{ data: docs }, { data: reports }] = await Promise.all([
-    client.from("client_documents").select("*").eq("submission_id", appState.submission.id).order("uploaded_at",{ascending:false}),
-    client.from("client_reports").select("*").eq("submission_id", appState.submission.id).order("sent_at",{ascending:false}),
+    client.from("client_documents").select("*").eq("client_id", uid).order("uploaded_at",{ascending:false}),
+    client.from("client_reports").select("*").eq("client_id", uid).order("sent_at",{ascending:false}),
   ]);
   appState.documents = docs || [];
   appState.reports = reports || [];
@@ -360,24 +367,25 @@ async function uploadDocument(docType, file){
   appState.uploadError = "";
   try{
     var client = getClient();
-    var sub = appState.submission;
+    var acc = appState.account;
     // ⚠ CONVENTION DE CHEMIN LIÉE AUX POLICIES SQL (supabase/schema-v2-portail-client.sql,
-    // policies "client-documents ..." qui lisent (storage.foldername(name))[1])
-    // ET à la même convention utilisée côté conseiller dans
-    // lib/conseiller-app.js (fonction advisorUploadDocument) — ne pas changer
-    // la forme "<id du dossier>/..." sans mettre à jour les policies SQL.
-    var path = sub.id + "/" + docType + "-" + Date.now() + "-" + file.name;
+    // section 9, policies "client-documents ..." qui lisent
+    // (storage.foldername(name))[1]) ET à la même convention utilisée côté
+    // conseiller dans lib/conseiller-app.js (fonction advisorUploadDocument)
+    // — ne pas changer la forme "<id du COMPTE>/..." sans mettre à jour les
+    // policies SQL.
+    var path = acc.id + "/" + docType + "-" + Date.now() + "-" + file.name;
     var upload = await client.storage.from("client-documents").upload(path, file, { upsert:false });
     if(upload.error) throw new Error(upload.error.message);
     var insert = await client.from("client_documents").insert({
-      submission_id: sub.id,
+      client_id: acc.id,
       doc_type: docType,
       file_name: file.name,
       storage_path: path,
       status: "a_valider",
     });
     if(insert.error) throw new Error(insert.error.message);
-    var { data: docs } = await client.from("client_documents").select("*").eq("submission_id", sub.id).order("uploaded_at",{ascending:false});
+    var { data: docs } = await client.from("client_documents").select("*").eq("client_id", acc.id).order("uploaded_at",{ascending:false});
     appState.documents = docs || [];
     showToast("Document transmis ✓");
     render();
