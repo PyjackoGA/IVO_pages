@@ -81,6 +81,39 @@
 .doc-uploadbox{border:1.5px dashed var(--border);border-radius:6px;padding:14px 16px;margin-bottom:10px;background:var(--surface-2);display:flex;align-items:center;gap:14px;}
 .link-account-box{border:1px dashed var(--border);border-radius:6px;padding:14px 16px;margin-top:6px;background:var(--surface-2);}
 .link-account-box input{margin-top:8px;}
+
+/* ⚠ LIÉ À lib/conseiller-app.js (renderBibliothequeSection(), renderAccountBaseTab(),
+   renderLibFileRow()) : base documentaire, glisser-déposer. */
+.libgrid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:18px;align-items:start;}
+@media (max-width:860px){.libgrid{grid-template-columns:1fr;}}
+.accgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:14px;}
+@media (max-width:860px){.accgrid{grid-template-columns:1fr;}}
+.libtoolbar{margin-bottom:10px;}
+.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 12px;font-size:13px;}
+.crumb{cursor:pointer;font-weight:700;color:var(--heading);padding:5px 9px;border-radius:6px;border:1.5px dashed transparent;}
+.crumb:hover{background:var(--surface-2);}
+.crumb.drag-over,.foldercard.drag-over{border-color:var(--accent);background:var(--blue-soft);}
+.crumb-sep{color:var(--text-muted);}
+.foldergrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:14px;}
+.foldercard{display:flex;align-items:center;gap:8px;border:1.5px solid var(--border);border-radius:10px;padding:10px 10px;background:var(--surface);cursor:grab;}
+.foldercard .fc-open{display:flex;align-items:center;gap:8px;flex:1 1 auto;min-width:0;cursor:pointer;}
+.fc-icon{font-size:22px;flex-shrink:0;}
+.foldercard .advisor-toggle{padding:4px;}
+.libbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12.5px;color:var(--text-muted);}
+.libbar select{max-width:230px;}
+.filelist{display:flex;flex-direction:column;gap:8px;}
+.fileitem{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--surface);cursor:grab;}
+.fileitem:active{cursor:grabbing;}
+.fileitem input[type=checkbox]{flex-shrink:0;}
+.fi-main{flex:1 1 auto;min-width:0;}
+.fi-name{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fi-meta{font-size:11.5px;color:var(--text-muted);margin-top:2px;}
+.fileitem .docrow-actions{flex-wrap:wrap;justify-content:flex-end;}
+.dnd-target{display:flex;align-items:center;gap:8px;border:1.5px dashed var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface-2);}
+.dnd-zone{border:1.5px dashed var(--border);border-radius:10px;padding:14px;background:var(--surface-2);min-height:200px;}
+.dnd-zone .dz-title{font-weight:800;font-size:14px;color:var(--heading);}
+.dnd-zone .dz-sub{font-size:12px;color:var(--text-muted);margin-top:2px;}
+.dnd-target.drag-over,.dnd-zone.drag-over{border-color:var(--accent);background:var(--blue-soft);}
 </style>
 </head>
 <body>
