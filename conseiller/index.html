@@ -102,13 +102,18 @@
 .libbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12.5px;color:var(--text-muted);}
 .libbar select{max-width:230px;}
 .filelist{display:flex;flex-direction:column;gap:8px;}
-.fileitem{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--surface);cursor:grab;}
+.fileitem{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--surface);cursor:grab;}
 .fileitem:active{cursor:grabbing;}
-.fileitem input[type=checkbox]{flex-shrink:0;}
+.fileitem input[type=checkbox]{flex-shrink:0;margin-top:3px;}
+.fi-icon{font-size:20px;line-height:1.1;flex-shrink:0;}
 .fi-main{flex:1 1 auto;min-width:0;}
 .fi-name{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.fi-meta{font-size:11.5px;color:var(--text-muted);margin-top:2px;}
-.fileitem .docrow-actions{flex-wrap:wrap;justify-content:flex-end;}
+.fileitem .fi-name{white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3;}
+.fi-meta{font-size:11.5px;color:var(--text-muted);margin-top:3px;}
+.fi-actions{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:6px;}
+.linkbtn{background:none;border:none;padding:0;font-family:inherit;font-size:12px;font-weight:600;color:var(--heading);cursor:pointer;}
+.linkbtn:hover{text-decoration:underline;}
+.linkbtn.danger{color:var(--danger);}
 .dnd-target{display:flex;align-items:center;gap:8px;border:1.5px dashed var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface-2);}
 .dnd-zone{border:1.5px dashed var(--border);border-radius:10px;padding:14px;background:var(--surface-2);min-height:200px;}
 .dnd-zone .dz-title{font-weight:800;font-size:14px;color:var(--heading);}
