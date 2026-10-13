@@ -114,6 +114,19 @@
 .linkbtn{background:none;border:none;padding:0;font-family:inherit;font-size:12px;font-weight:600;color:var(--heading);cursor:pointer;}
 .linkbtn:hover{text-decoration:underline;}
 .linkbtn.danger{color:var(--danger);}
+
+/* ⚠ LIÉ À lib/conseiller-app.js (RISK_LEVELS + riskTagHtml()) : une classe
+   risk-<clé> par niveau — mêmes clés que la contrainte SQL de client_internal
+   (supabase/schema-v2-portail-client.sql section 11). */
+.risk-tag{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid var(--border);white-space:nowrap;flex-shrink:0;}
+.risk-faible{background:var(--success-soft);border-color:var(--success);color:var(--success);}
+.risk-modere{background:#FFF3D6;border-color:#E3B341;color:#7A5200;}
+.risk-eleve{background:var(--danger-soft);border-color:var(--danger);color:var(--danger);}
+.risk-none{background:var(--surface-2);color:var(--text-muted);font-weight:600;}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .risk-modere{background:#3A2E10;border-color:#8A6A1C;color:#F2C86B;}
+}
+:root[data-theme="dark"] .risk-modere{background:#3A2E10;border-color:#8A6A1C;color:#F2C86B;}
 .dnd-target{display:flex;align-items:center;gap:8px;border:1.5px dashed var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface-2);}
 .dnd-zone{border:1.5px dashed var(--border);border-radius:10px;padding:14px;background:var(--surface-2);min-height:200px;}
 .dnd-zone .dz-title{font-weight:800;font-size:14px;color:var(--heading);}
