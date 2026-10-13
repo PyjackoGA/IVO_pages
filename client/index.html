@@ -23,7 +23,6 @@
 "use strict";
 
 var STORAGE_KEY = "ivo_kyc_draft_v1";
-var ADVISOR_EMAIL = "tristan.dantin@ivocapital.com";
 
 var STEPS = [
   {key:"identite", label:"Identité"},
@@ -134,7 +133,6 @@ function rollQuiz(key){
 function defaultState(){
   return {
     step:-1,
-    advisorDraft:{email:"", name:""},
     sentAt:null,
     pdfDownloaded:false,
     advisorEmail:"",
@@ -164,6 +162,7 @@ function defaultState(){
       impot:""},
 
     instruments:(function(){var o={};INSTRUMENTS.forEach(function(i){o[i.k]={connait:null,ops:null,declared:null,quizIdx:null,quizOrder:null,quizSelected:null};});return o;})(),
+    instrIdx:0, // écran en cours DANS l'étape "Connaissances" : 0..8 = un instrument par écran, 9 = questions oui/non finales
     gereSeul:null, gereSeulDepuis:"", mandatGestion:null, experiencePro:null, gains:null, pertes:null, conscienceRisque:null,
 
     objOrder: ["valoriser","completer","diversifier","securite","fiscalite","performance","succession"],
@@ -180,10 +179,10 @@ function defaultState(){
 }
 
 var state = load() || defaultState();
-if(!state.advisorDraft){ state.advisorDraft = {email:"", name:""}; }
 if(typeof state.sentAt === "undefined"){ state.sentAt = null; }
 if(typeof state.pdfDownloaded === "undefined"){ state.pdfDownloaded = false; }
 if(typeof state.advisorEmail === "undefined"){ state.advisorEmail = ""; }
+if(typeof state.instrIdx === "undefined"){ state.instrIdx = 0; }
 INSTRUMENTS.forEach(function(ins){
   var v = state.instruments[ins.k];
   if(!v){ state.instruments[ins.k] = {connait:null,ops:null,declared:null,quizIdx:null,quizOrder:null,quizSelected:null}; return; }
@@ -194,12 +193,6 @@ INSTRUMENTS.forEach(function(ins){
 });
 var visited = {}; // steps visited, for progress checkmarks
 if(state.step >= 0){ for(var i=0;i<=state.step;i++) visited[i]=true; }
-var advisorPanelOpen = false;
-
-function advisorDisplayName(){
-  var local = ADVISOR_EMAIL.split("@")[0];
-  return local.split(/[._-]/).map(function(p){ return p.charAt(0).toUpperCase()+p.slice(1); }).join(" ");
-}
 
 function load(){
   try{
@@ -276,7 +269,7 @@ function isStepComplete(i){
     case "patrimoine":
       return true; // toutes les valeurs sont volontairement facultatives sur cette étape
     case "connaissance":
-      var instrOk = INSTRUMENTS.every(function(ins){ return state.instruments[ins.k].connait!==null; });
+      var instrOk = INSTRUMENTS.every(function(ins){ var iv = state.instruments[ins.k]; return iv.connait!==null && iv.ops!==null; });
       return instrOk && state.gereSeul!==null && state.mandatGestion!==null && state.experiencePro!==null &&
         state.gains!==null && state.pertes!==null && state.conscienceRisque!==null;
     case "objectifs":
@@ -331,30 +324,7 @@ function renderIntro(){
       '<button class="btn btn-primary" data-action="start">Commencer</button>' +
       (hasDraft ? '<button class="btn btn-ghost" data-action="reset">Recommencer à zéro</button>' : '') +
     '</div>' +
-  '</div>' +
-  renderAdvisorBox();
-}
-
-function renderAdvisorBox(){
-  var html = '<div class="advisor-box">' +
-    '<button class="advisor-toggle" data-action="toggleAdvisor">🔧 Espace conseiller — partager ce lien avec un client'+(advisorPanelOpen?" ▲":" ▼")+'</button>';
-  if(advisorPanelOpen){
-    var link = (typeof window!=="undefined" && window.location && window.location.href) ? window.location.href : "";
-    html += '<div class="advisor-panel">' +
-      '<p class="advisor-note">Ce lien est celui de cette page. Partagez-le tel quel, ou pré-remplissez une invitation ci-dessous.</p>' +
-      '<div class="field-row">' +
-        textField("advisorDraft.name","Prénom du client","",false) +
-        emailField("advisorDraft.email","Email du client",false) +
-      '</div>' +
-      '<div class="actionrow">' +
-        '<button class="btn btn-ghost" data-action="advisorCopyLink">🔗 Copier le lien</button>' +
-        '<button class="btn btn-gold" data-action="advisorMailto">✉ Préparer l\'invitation</button>' +
-      '</div>' +
-      (link ? '<div class="advisor-link">'+esc(link)+'</div>' : '') +
-    '</div>';
-  }
-  html += '</div>';
-  return html;
+  '</div>';
 }
 
 function renderStep(i){
@@ -558,32 +528,69 @@ function patrimoineTotal(){
   }
 }
 
-/* ---------- STEP 4 : CONNAISSANCE ---------- */
+/* ---------- STEP 4 : CONNAISSANCE ----------
+   Parcours EN INTERNE à l'étape 4 (la progression du haut reste "Étape 4 / 7") :
+   - state.instrIdx 0..8 : UN INSTRUMENT PAR ÉCRAN — son titre, la question de
+     connaissance (réponse directe, plus de "je connais / je ne connais pas") et,
+     juste dessous, la question sur le nombre d'opérations des 12 derniers mois ;
+   - state.instrIdx 9 : les questions oui/non finales (gère seul, mandat...).
+   ⚠ LIÉ À lib/pdf-fill.js : le PDF ne lit que state.instruments[k].connait
+   (true/false) et .ops ("aucune"/"1"/"5") — ces deux valeurs doivent rester
+   renseignées ici, quel que soit l'écran. connait = la réponse choisie est la
+   bonne ; "Je ne sais pas" ou une mauvaise réponse = false. */
+function ensureQuiz(k){
+  var v = state.instruments[k];
+  if(v.quizIdx===null || v.quizIdx===undefined || !QUIZ_BANK[k][v.quizIdx] || !v.quizOrder){
+    var r = rollQuiz(k);
+    v.quizIdx = r.quizIdx;
+    v.quizOrder = r.quizOrder;
+    save();
+  }
+}
+
 function stepConnaissance(){
-  var html = '<div class="eyebrow">Étape 4 / 7</div><h2 class="step-title">Vos connaissances et votre expérience</h2>' +
-    '<p class="step-intro">Pour chaque instrument, indiquez si vous en connaissez les risques et le nombre d\'opérations réalisées ces 12 derniers mois.</p>' +
-    '<div class="instr">';
+  var N = INSTRUMENTS.length;
+  var i = Math.max(0, Math.min(N, state.instrIdx||0));
+  return i < N ? renderInstrumentScreen(i) : renderLastQuestionsScreen();
+}
 
-    INSTRUMENTS.forEach(function(ins){
-    var v = state.instruments[ins.k];
-    html += '<div class="irow">' +
-      '<div class="iname">'+ins.n+'</div>' +
-      '<div class="icontrols">' +
-        '<div class="iyn">' +
-          '<button class="'+(v.declared==="know"?"on":"")+'" data-action="instrKnow" data-key="'+ins.k+'">Je connais</button>' +
-          '<button class="'+(v.declared==="dontknow"?"on":"")+'" data-action="instrDontKnow" data-key="'+ins.k+'">Je ne connais pas</button>' +
-        '</div>' +
-        '<div class="iops"><span class="iops-label">Opérations (12 mois) :</span>' +
-          opsBtn("instruments."+ins.k+".ops","aucune",v.ops,"Aucune") +
-          opsBtn("instruments."+ins.k+".ops","1",v.ops,"Au moins 1") +
-          opsBtn("instruments."+ins.k+".ops","5",v.ops,"Au moins 5") +
-        '</div>' +
-      '</div>' +
-      renderInstrumentFeedback(ins, v) +
-    '</div>';
+function renderInstrumentScreen(i){
+  var N = INSTRUMENTS.length;
+  var ins = INSTRUMENTS[i];
+  var v = state.instruments[ins.k];
+  ensureQuiz(ins.k);
+  var entry = QUIZ_BANK[ins.k][v.quizIdx];
+  var picked = v.quizSelected;
+  if(picked===null && v.connait===false) picked = -1; // ancien brouillon "je ne connais pas"
+
+  var html = '<div class="eyebrow">Étape 4 / 7 · Vos connaissances</div>' +
+    '<div class="iprog"><span>Instrument '+(i+1)+' sur '+N+'</span><div class="iprog-bar"><i style="width:'+Math.round(((i+1)/N)*100)+'%"></i></div></div>' +
+    '<h2 class="step-title">'+ins.n+'</h2>' +
+    '<p class="step-intro">'+ins.d+'</p>';
+
+  html += '<div class="field"><label class="flabel">'+entry.q+'</label><div class="qa-opts">';
+  v.quizOrder.forEach(function(optIdx){
+    html += '<button class="qa-opt'+(picked===optIdx?" on":"")+'" data-action="quizAnswer" data-key="'+ins.k+'" data-value="'+optIdx+'">'+entry.opts[optIdx]+'</button>';
   });
-  html += '</div>';
+  html += '<button class="qa-opt qa-idk'+(picked===-1?" on":"")+'" data-action="quizIdk" data-key="'+ins.k+'">Je ne sais pas</button>';
+  html += '</div></div>';
 
+  html += '<div class="field"><label class="flabel">Combien d\'opérations avez-vous réalisées sur des '+ins.n.charAt(0).toLowerCase()+ins.n.slice(1)+' au cours des 12 derniers mois ?</label><div class="chips">' +
+    chip("instruments."+ins.k+".ops","aucune",v.ops,"Aucune") +
+    chip("instruments."+ins.k+".ops","1",v.ops,"1 à 4") +
+    chip("instruments."+ins.k+".ops","5",v.ops,"5 ou plus") +
+  '</div></div>';
+
+  html += '<div class="navrow">' +
+    '<button class="btn btn-ghost" data-action="instrPrev">← Précédent</button>' +
+    '<button class="btn btn-primary" data-action="instrNext">Suivant →</button>' +
+  '</div>';
+  return html;
+}
+
+function renderLastQuestionsScreen(){
+  var html = '<div class="eyebrow">Étape 4 / 7 · Votre expérience</div><h2 class="step-title">Votre expérience des marchés</h2>' +
+    '<p class="step-intro">Encore quelques questions rapides.</p>';
   html += yesNoField("gereSeul","Gérez-vous vous-même votre portefeuille ?");
   if(state.gereSeul===true){ html += fieldRow([textField("gereSeulDepuis","Depuis combien de temps ?")]); }
   html += yesNoField("mandatGestion","Avez-vous (ou avez-vous déjà eu) un portefeuille géré sous mandat ?");
@@ -591,39 +598,11 @@ function stepConnaissance(){
   html += yesNoField("gains","Avez-vous déjà réalisé des gains sur des produits financiers ?");
   html += yesNoField("pertes","Avez-vous déjà subi des pertes sur des produits financiers ?");
   html += yesNoField("conscienceRisque","Avez-vous conscience des pertes en capital possibles liées aux investissements sur les marchés financiers ?");
-
-  html += navButtons();
+  html += '<div class="navrow">' +
+    '<button class="btn btn-ghost" data-action="instrPrev">← Précédent</button>' +
+    '<button class="btn btn-primary" data-action="next">Continuer →</button>' +
+  '</div>';
   return html;
-}
-
-function renderInstrumentFeedback(ins, v){
-  if(v.declared==="dontknow"){
-    return '<div class="info"><span class="ic">ℹ️</span><div><b>'+ins.n+'</b> — '+ins.d+'</div></div>';
-  }
-  if(v.declared==="know"){
-    var entry = QUIZ_BANK[ins.k][v.quizIdx];
-    var html = '<div class="iquiz">' +
-      '<div class="iquiz-q">Pour confirmer : '+entry.q+'</div>' +
-      '<div class="iquiz-opts">';
-    v.quizOrder.forEach(function(optIdx){
-      var cls = "";
-      if(v.quizSelected!==null){
-        if(optIdx===v.quizSelected) cls = (optIdx===entry.correct) ? "picked-correct" : "picked-wrong";
-      }
-      html += '<button class="'+cls+'" data-action="quizAnswer" data-key="'+ins.k+'" data-value="'+optIdx+'"'+(v.quizSelected!==null?" disabled":"")+'>'+entry.opts[optIdx]+'</button>';
-    });
-    html += '</div>';
-    if(v.quizSelected!==null){
-      if(v.quizSelected===entry.correct){
-        html += '<div class="iquiz-feedback ok">✓ Connaissance confirmée pour cet instrument.</div>';
-      } else {
-        html += '<div class="iquiz-feedback ko">Cette réponse ne permet pas de confirmer la connaissance de cet instrument — il sera considéré comme non maîtrisé. Vous pouvez recliquer sur "Je connais" pour retenter.</div>';
-      }
-    }
-    html += '</div>';
-    return html;
-  }
-  return "";
 }
 
 /* ---------- STEP 5 : OBJECTIFS ---------- */
@@ -864,7 +843,7 @@ function connaissanceRecapRows(){
   INSTRUMENTS.forEach(function(ins){
     var v = state.instruments[ins.k];
     if(v.connait!=null || v.ops!=null){
-      rows.push([ins.n, (v.connait===true?"Connaît":v.connait===false?"Ne connaît pas":"—") + (v.ops?" · "+({aucune:"aucune opération",1:"≥1 opération",5:"≥5 opérations"}[v.ops]):"")]);
+      rows.push([ins.n, (v.connait===true?"Connaît":v.connait===false?"Ne connaît pas":"—") + (v.ops?" · "+({aucune:"aucune opération",1:"1 à 4 opérations",5:"5 opérations ou plus"}[v.ops]):"")]);
     }
   });
   rows.push(["Gère seul son portefeuille", yn(state.gereSeul)]);
@@ -1013,9 +992,6 @@ function optCard(path,val,current,title,desc){
 function ynBtn(path,val,current,label){
   return '<button class="'+(current===val?"on":"")+'" data-action="setbool" data-path="'+path+'" data-value="'+val+'">'+label+'</button>';
 }
-function opsBtn(path,val,current,label){
-  return '<button class="'+(current===val?"on":"")+'" data-action="set" data-path="'+path+'" data-value="'+val+'">'+label+'</button>';
-}
 function statTile(label, value){
   return '<div class="stattile"><span class="sl">'+label+'</span><span class="sv tabular">'+fmt(value)+' <small>K€</small></span></div>';
 }
@@ -1041,22 +1017,6 @@ function bindEvents(){
       e.preventDefault();
       var action = el.getAttribute("data-action");
       if(action==="start"){ state.step=0; visited[0]=true; save(); render(true); return; }
-      if(action==="toggleAdvisor"){ advisorPanelOpen = !advisorPanelOpen; render(false); return; }
-      if(action==="advisorCopyLink"){ copyText(window.location.href); return; }
-      if(action==="advisorMailto"){
-        var clientEmail = (state.advisorDraft.email||"").trim();
-        if(!clientEmail){ showToast("Merci de renseigner l'email du client"); return; }
-        var clientName = (state.advisorDraft.name||"").trim();
-        var advisor = advisorDisplayName();
-        var subject2 = "Votre questionnaire de connaissance client — IVO Capital Partners";
-        var body2 = "Bonjour"+(clientName?" "+clientName:"")+",\n\n"+
-          "Afin de préparer au mieux votre accompagnement, pourriez-vous prendre quelques minutes pour compléter ce questionnaire en ligne :\n"+
-          window.location.href+"\n\n"+
-          "Vos réponses restent strictement confidentielles et me permettront de mieux cerner votre situation et vos objectifs avant notre prochain échange.\n\n"+
-          "Bien à vous,\n"+advisor+"\nIVO Capital Partners";
-        window.location.href = "mailto:"+encodeURIComponent(clientEmail)+"?subject="+encodeURIComponent(subject2)+"&body="+encodeURIComponent(body2);
-        return;
-      }
       if(action==="reset"){
         if(confirm("Recommencer le questionnaire à zéro ? Vos réponses actuelles seront perdues.")){
           state = defaultState(); visited={}; save(); render(true);
@@ -1073,12 +1033,14 @@ function bindEvents(){
         visited[state.step]=true;
         state.step = Math.min(STEPS.length-1, state.step+1);
         visited[state.step]=true;
+        if(STEPS[state.step].key==="connaissance") state.instrIdx = 0;
         save(); render(true); return;
       }
       if(action==="prev"){
         visited[state.step]=true;
         state.step = Math.max(0, state.step-1);
         visited[state.step]=true;
+        if(STEPS[state.step].key==="connaissance") state.instrIdx = INSTRUMENTS.length;
         save(); render(true); return;
       }
       if(action==="set"){ setPath(state, el.getAttribute("data-path"), el.getAttribute("data-value")); save(); render(false); return; }
@@ -1098,32 +1060,28 @@ function bindEvents(){
         if(j>=0 && j<arr2.length){ var tmp=arr2[i0]; arr2[i0]=arr2[j]; arr2[j]=tmp; }
         save(); render(false); return;
       }
-            if(action==="instrKnow"){
-        var ik = el.getAttribute("data-key");
-        var rolled = rollQuiz(ik);
-        state.instruments[ik].declared = "know";
-        state.instruments[ik].quizIdx = rolled.quizIdx;
-        state.instruments[ik].quizOrder = rolled.quizOrder;
-        state.instruments[ik].quizSelected = null;
-        state.instruments[ik].connait = null;
-        save(); render(false); return;
-      }
-      if(action==="instrDontKnow"){
-        var idk = el.getAttribute("data-key");
-        state.instruments[idk].declared = "dontknow";
-        state.instruments[idk].connait = false;
-        state.instruments[idk].quizSelected = null;
-        save(); render(false); return;
-      }
       if(action==="quizAnswer"){
         var qk = el.getAttribute("data-key");
         var picked = parseInt(el.getAttribute("data-value"),10);
         var inst = state.instruments[qk];
-        if(inst.quizSelected!==null) return;
         inst.quizSelected = picked;
-        var entry = QUIZ_BANK[qk][inst.quizIdx];
-        inst.connait = (picked === entry.correct);
+        inst.connait = (picked === QUIZ_BANK[qk][inst.quizIdx].correct);
         save(); render(false); return;
+      }
+      if(action==="quizIdk"){
+        var ik = state.instruments[el.getAttribute("data-key")];
+        ik.quizSelected = -1;
+        ik.connait = false;
+        save(); render(false); return;
+      }
+      if(action==="instrPrev"){
+        if((state.instrIdx||0) > 0){ state.instrIdx = state.instrIdx - 1; }
+        else { state.step = Math.max(0, state.step-1); visited[state.step]=true; }
+        save(); render(true); return;
+      }
+      if(action==="instrNext"){
+        state.instrIdx = Math.min(INSTRUMENTS.length, (state.instrIdx||0) + 1);
+        save(); render(true); return;
       }
       if(action==="copy"){
         var txt = buildSyntheseText();
