@@ -57,7 +57,7 @@
 .btn[disabled]{opacity:.55;cursor:default;}
 
 /* --- ZONES DE DÉPÔT : une bordure en pointillés = on peut VRAIMENT y glisser
-   un fichier (⚠ LIÉ À bindDrops() plus bas : attributs data-drop-doctype et
+   un fichier (⚠ LIÉ À bindDrops() plus bas : attributs data-drop-item et
    data-drop-free). Ne jamais mettre de pointillés ailleurs. --- */
 .subitem.dropt{border-style:dashed;}
 .subitem.dropt.filled{border-style:solid;}
@@ -150,6 +150,34 @@ var FREE_NATURES = [
 function requestedDocTypes(){
   var keys = (appState.account && appState.account.requested_docs) || [];
   return DOC_TYPES.filter(function(t){ return keys.indexOf(t.key) > -1; });
+}
+
+/* --- DOCUMENTS LIBRES demandés par le conseiller (intitulé qu'il a écrit,
+   hors liste DOC_TYPES) : profiles.requested_custom_docs.
+   ⚠ LIÉ À lib/conseiller-app.js (requestDocument(), docLabel()) et au SQL
+   section 14. Un fichier qui répond à une demande libre est enregistré avec
+   doc_type = "autre" + custom_label = l'intitulé. --- */
+function requestedCustomDocs(){
+  return (appState.account && appState.account.requested_custom_docs) || [];
+}
+
+/* TOUT ce qui est demandé à ce client, dans l'ordre d'affichage : les types
+   de la liste puis les documents libres. C'est CETTE liste que parcourent le
+   tableau de bord et l'onglet "Mes documents". Chaque élément :
+   { label, docType, customLabel (null si type de la liste) }. */
+function requestedItems(){
+  return requestedDocTypes().map(function(t){ return { label: t.label, docType: t.key, customLabel: null }; })
+    .concat(requestedCustomDocs().map(function(l){ return { label: l, docType: "autre", customLabel: l }; }));
+}
+
+/* Dernier fichier transmis pour une demande (null si rien). */
+function latestDocFor(item){
+  var matching = appState.documents.filter(function(d){
+    return item.customLabel ? d.custom_label===item.customLabel : (d.doc_type===item.docType && !d.custom_label);
+  });
+  if(!matching.length) return null;
+  matching.sort(function(a,b){ return new Date(b.uploaded_at) - new Date(a.uploaded_at); });
+  return matching[0];
 }
 
 /* Nom d'affichage du compte selon son type (mêmes règles que
@@ -332,13 +360,6 @@ function docBadge(status){
   return '<span class="badge badge-recu">En attente de validation</span>';
 }
 
-function latestDocByType(type){
-  var matching = appState.documents.filter(function(d){ return d.doc_type===type; });
-  if(!matching.length) return null;
-  matching.sort(function(a,b){ return new Date(b.uploaded_at) - new Date(a.uploaded_at); });
-  return matching[0];
-}
-
 function unreadCount(){
   return appState.messages.filter(function(m){ return m.from_advisor && !m.read_at; }).length;
 }
@@ -350,8 +371,11 @@ function tabBtn(key, label, badge){
 
 function renderDashboard(){
   var acc = appState.account;
-  var myDocTypes = requestedDocTypes();
-  var validCount = myDocTypes.filter(function(t){ var d = latestDocByType(t.key); return d && d.status==="valide"; }).length;
+  var items = requestedItems(); // types de la liste + documents libres demandés
+  // "fourni" = un fichier a été transmis et n'a pas été refusé (validé ou en
+  // attente de validation) ; "manquant" = rien transmis, ou refusé.
+  var providedCount = items.filter(function(it){ var d = latestDocFor(it); return d && d.status!=="refuse"; }).length;
+  var missingCount = items.length - providedCount;
   var lastReport = appState.reports.length ? appState.reports[0] : null;
   var unread = unreadCount();
 
@@ -368,18 +392,18 @@ function renderDashboard(){
     html += '<h1 class="step-title">'+esc(accountDisplayName(acc)||"")+'</h1>';
     html += '<p class="step-intro">Voici un aperçu de votre espace chez IVO Capital Partners.</p>';
     html += '<div class="statgrid">' +
-      '<div class="stattile2"><div class="l">Documents fournis</div><div class="v">'+validCount+' <small style="font-size:12px;color:var(--text-muted)">/ '+myDocTypes.length+'</small></div></div>' +
+      '<div class="stattile2"><div class="l">Documents fournis</div><div class="v">'+providedCount+' <small style="font-size:12px;color:var(--text-muted)">/ '+items.length+'</small></div></div>' +
       '<div class="stattile2"><div class="l">Dernier bilan reçu</div><div class="v" style="font-size:15px">'+(lastReport?esc(fmtDateTime(lastReport.sent_at)):'—')+'</div></div>' +
       '<div class="stattile2"><div class="l">Messages non lus</div><div class="v" id="statUnread">'+unread+'</div></div>' +
     '</div>';
-    if(myDocTypes.length && validCount < myDocTypes.length){
-      html += '<div class="info"><span class="ic">ℹ️</span><div>Il vous reste des documents à transmettre pour finaliser votre dossier. <a href="#" data-action="goDocuments" style="color:var(--heading);font-weight:700">Voir mes documents</a></div></div>';
+    if(missingCount > 0){
+      html += '<div class="info"><span class="ic">ℹ️</span><div>Pour régulariser votre dossier, votre conseiller aurait besoin de nouveaux documents. <a href="#" data-action="goDocuments" style="color:var(--heading);font-weight:700">Voir mes documents</a></div></div>';
     }
     if(unread){
       html += '<div class="info"><span class="ic">✉️</span><div>Votre conseiller vous a écrit. <a href="#" data-action="goMessages" style="color:var(--heading);font-weight:700">Lire le message</a></div></div>';
     }
   } else if(appState.tab==="documents"){
-    html += renderDocumentsTab(myDocTypes);
+    html += renderDocumentsTab(items);
   } else if(appState.tab==="bilans"){
     html += '<h1 class="step-title" style="margin-bottom:4px">Mes bilans</h1>';
     html += '<p class="section-sub">Les comptes rendus et bilans transmis par votre conseiller.</p>';
@@ -416,26 +440,29 @@ function fileRow(f, sub){
   '</div>';
 }
 
-function renderDocumentsTab(myDocTypes){
+function renderDocumentsTab(items){
   var html = '<h1 class="step-title" style="margin-bottom:4px">Mes documents</h1>';
   if(appState.uploadError) html += '<div class="err-box">'+esc(appState.uploadError)+'</div>';
 
   /* --- 1) DOCUMENTS DEMANDÉS PAR LE CONSEILLER ---
-     Chaque ligne est une vraie zone de dépôt (data-drop-doctype). */
+     Chaque ligne est une vraie zone de dépôt. ⚠ data-drop-item / data-item =
+     le NUMÉRO de la demande dans requestedItems() (pas un type) : c'est ce qui
+     permet de traiter pareil un type de la liste et un document libre — voir
+     uploadForItem() plus bas. */
   html += '<div class="block-title" style="margin-top:14px">Documents demandés</div>';
   html += '<p class="section-sub">Glissez le fichier sur sa ligne, ou cliquez sur le bouton. Votre conseiller le valide ensuite.</p>';
-  if(!myDocTypes.length){
+  if(!items.length){
     html += '<div class="empty-state" style="padding:18px">Aucun document ne vous est demandé pour l\'instant.</div>';
   } else {
     html += '<div class="sublist">';
-    myDocTypes.forEach(function(t){
-      var d = latestDocByType(t.key);
-      html += '<div class="subitem dropt'+(d?' filled':'')+'" data-drop-doctype="'+t.key+'">' +
+    items.forEach(function(t, idx){
+      var d = latestDocFor(t);
+      html += '<div class="subitem dropt'+(d?' filled':'')+'" data-drop-item="'+idx+'">' +
         '<div><div class="subitem-name">'+esc(t.label)+'</div>' +
         '<div class="subitem-meta">'+(d?esc(d.file_name||""):'Aucun fichier transmis')+'</div></div>' +
         docBadge(d && d.status) +
         '<label class="btn '+(d&&d.status==="valide"?"btn-ghost":"btn-primary")+'" style="cursor:pointer">'+(d?'Remplacer':'Téléverser')+
-          '<input type="file" data-action="uploadDoc" data-doctype="'+t.key+'" style="display:none">' +
+          '<input type="file" data-action="uploadDoc" data-item="'+idx+'" style="display:none">' +
         '</label>' +
       '</div>';
     });
@@ -532,7 +559,6 @@ function renderMessagesTab(){
     '<button type="button" class="btn btn-primary" data-action="sendMessage"'+(appState.msgSending?" disabled":"")+'>Envoyer</button>' +
   '</div>';
   if(appState.msgError) html += '<div class="err-box">'+esc(appState.msgError)+'</div>';
-  html += '<p class="section-sub" style="margin:10px 0 0">Astuce : Ctrl + Entrée envoie le message.</p>';
   return html;
 }
 
@@ -702,7 +728,7 @@ function bindEvents(){
         if(action==="uploadDoc"){
           var f1 = el.files && el.files[0];
           el.value = "";
-          if(f1) uploadDocument(el.getAttribute("data-doctype"), f1);
+          if(f1) uploadForItem(el.getAttribute("data-item"), f1);
           return;
         }
         if(action==="freeNatureChange"){ appState.freeNature = el.value; return; }
@@ -738,11 +764,11 @@ function bindEvents(){
   bindDrops();
 }
 
-/* --- GLISSER-DÉPOSER : les lignes de documents demandés (data-drop-doctype)
+/* --- GLISSER-DÉPOSER : les lignes de documents demandés (data-drop-item)
    et la zone d'envoi libre (data-drop-free) acceptent un fichier venu de
    l'ordinateur. --- */
 function bindDrops(){
-  document.querySelectorAll("[data-drop-doctype],[data-drop-free]").forEach(function(el){
+  document.querySelectorAll("[data-drop-item],[data-drop-free]").forEach(function(el){
     if(el.__dropBound) return;
     el.__dropBound = true;
     el.__dc = 0;
@@ -754,8 +780,8 @@ function bindDrops(){
       el.__dc = 0; el.classList.remove("drag-over");
       var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
       if(!file) return;
-      var type = el.getAttribute("data-drop-doctype");
-      if(type) uploadDocument(type, file);
+      var itemIdx = el.getAttribute("data-drop-item");
+      if(itemIdx !== null) uploadForItem(itemIdx, file);
       else uploadFreeDocument(file);
     });
   });
@@ -786,7 +812,15 @@ async function doLogin(){
 /* ==========================================================================
    ENVOIS DE FICHIERS
    ========================================================================== */
-async function uploadDocument(docType, file){
+/* Envoi pour la demande n° idx de requestedItems() (type de la liste ou
+   document libre). */
+function uploadForItem(idx, file){
+  var item = requestedItems()[parseInt(idx, 10)];
+  if(!item){ showToast("Cette demande n'existe plus — cliquez sur « Actualiser »."); return; }
+  return uploadDocument(item.docType, file, item.customLabel);
+}
+
+async function uploadDocument(docType, file, customLabel){
   appState.uploadError = "";
   try{
     checkUploadable(file);
@@ -802,14 +836,18 @@ async function uploadDocument(docType, file){
     var path = acc.id + "/" + storageSafeName(file);
     var upload = await client.storage.from("client-documents").upload(path, file, { upsert:false, contentType: file.type || undefined });
     if(upload.error) throw new Error(upload.error.message);
-    var insert = await client.from("client_documents").insert({
-      client_id: acc.id,
-      doc_type: docType,
-      file_name: file.name,
-      storage_path: path,
-      status: "a_valider",
-    });
-    if(insert.error) throw new Error(insert.error.message);
+    // ⚠ custom_label n'est envoyé QUE pour un document libre (voir
+    // requestedCustomDocs()) : un envoi classique ne dépend donc pas de la
+    // colonne ajoutée en section 14 du SQL.
+    var row = { client_id: acc.id, doc_type: docType, file_name: file.name, storage_path: path, status: "a_valider" };
+    if(customLabel) row.custom_label = customLabel;
+    var insert = await client.from("client_documents").insert(row);
+    if(insert.error){
+      // on tente de retirer le fichier déjà envoyé (sans effet si la base ne
+      // l'autorise pas au client : aucune conséquence pour lui)
+      try{ await client.storage.from("client-documents").remove([path]); }catch(e){}
+      throw new Error(insert.error.message);
+    }
     var { data: docs } = await client.from("client_documents").select("*").eq("client_id", acc.id).order("uploaded_at",{ascending:false});
     appState.documents = docs || [];
     showToast("Document transmis ✓");
