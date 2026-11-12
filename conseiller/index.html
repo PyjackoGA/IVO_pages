@@ -122,6 +122,16 @@
 .advisor-panel{border-style:solid;}
 .info{margin-bottom:14px;}
 
+/* --- ENCART "DOCUMENTS DEMANDÉS AU CLIENT" (onglet Justificatifs d'un compte)
+   ⚠ LIÉ À renderRequestedDocsBox() dans lib/conseiller-app.js --- */
+.reqlist{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.reqrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:13px;}
+.reqrow .reqname{flex:1 1 200px;min-width:0;font-weight:600;overflow-wrap:anywhere;}
+.reqadd{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.reqadd select{flex:1 1 220px;width:auto;margin:0;}
+.reqadd input{flex:2 1 260px;width:auto;margin:0;}
+.reqadd .btn{flex-shrink:0;}
+
 /* --- MESSAGERIE (⚠ LIÉ À renderMessagesTab()/renderThreadHtml() dans
    lib/conseiller-app.js ; mêmes classes que dans espace-client/index.html) --- */
 .thread{display:flex;flex-direction:column;gap:10px;height:400px;overflow-y:auto;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);}
