@@ -165,6 +165,10 @@ h1,h2,h3,.display{
 .pstep.done .pdot{border-color:var(--success);background:var(--success);color:#fff;}
 .plabel{font-size:10px;color:var(--text-muted);line-height:1.2;max-width:70px;}
 .pstep.active .plabel{color:var(--heading);font-weight:600;}
+/* ⚠ .pbar-track / .pbar-fill (barre fine sous les pastilles) ne servent plus
+   qu'à client/index-version-classique.html : la version actuelle du
+   questionnaire n'affiche que la barre .iprog, dans la carte. À supprimer le
+   jour où la version classique est supprimée. */
 .pbar-track{height:3px;background:var(--border);border-radius:3px;margin:-19px 0 0;position:relative;z-index:-1;}
 .pbar-fill{height:3px;background:var(--navy);border-radius:3px;transition:width .2s ease;}
 
@@ -236,10 +240,12 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--focus);outline-o
 
 /* ==========================================================================
    ÉCRANS INSTRUMENT PAR INSTRUMENT / QUESTION DE CONNAISSANCE + OPÉRATIONS
-   (étape 4 "Vos connaissances" du questionnaire : un écran par instrument)
-   ⚠ LIÉ À client/index.html (renderInstrumentScreen()) : classes .iprog,
-   .qa-opts, .qa-opt, .qa-idk. Les boutons "Aucune / 1 à 4 / 5 ou plus" des
-   opérations réutilisent la classe générique .chip.
+   .iprog = la petite barre "Question 3 sur 8" en haut de CHAQUE écran du
+   questionnaire (toutes les étapes sauf Patrimoine et Bilan).
+   ⚠ LIÉ À client/index.html (renderStep() pour .iprog, instrumentBody() pour
+   .qa-opts, .qa-opt, .qa-idk) et à client/index-version-classique.html
+   (ancienne version, qui utilise les mêmes classes). Les boutons "Aucune /
+   1 à 4 / 5 ou plus" des opérations réutilisent la classe générique .chip.
    ========================================================================== */
 .iprog{display:flex;align-items:center;gap:12px;margin:0 0 14px;font-size:12px;font-weight:600;color:var(--text-muted);}
 .iprog-bar{flex:1;height:4px;border-radius:2px;background:var(--border);overflow:hidden;}
