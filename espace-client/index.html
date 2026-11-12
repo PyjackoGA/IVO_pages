@@ -9,14 +9,16 @@
 <style>
 .wrap{max-width:820px;}
 .card{max-width:420px;margin:60px auto;}
-.card.wide{max-width:100%;}
+.card.wide{max-width:100%;margin:28px auto;}
 .login-field{margin-bottom:16px;}
 .topbar-user{margin-left:auto;display:flex;align-items:center;gap:10px;position:relative;z-index:1;}
 .topbar-user span{color:rgba(255,255,255,.85);font-size:12.5px;}
 .topbar-user button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:12px;font-weight:600;padding:6px 12px;border-radius:5px;cursor:pointer;}
 .topbar-user button:hover{background:rgba(255,255,255,.22);}
-.err-box{background:var(--danger-soft);border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:10px 12px;font-size:12.5px;margin-top:12px;}
-.empty-state{text-align:center;padding:50px 20px;color:var(--text-muted);font-size:13.5px;}
+/* petit écran : l'email déborderait du bandeau, on ne garde que "Déconnexion" */
+@media (max-width:560px){.topbar-user span{display:none;}}
+.err-box{background:var(--danger-soft);border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:10px 12px;font-size:12.5px;margin:12px 0;}
+.empty-state{text-align:center;padding:36px 20px;color:var(--text-muted);font-size:13.5px;}
 
 .badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap;}
 .badge-complete{background:var(--success-soft);color:var(--success);border:1px solid var(--success);}
@@ -24,31 +26,57 @@
 .badge-encours{background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);}
 .badge-danger{background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger);}
 
-.statgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:22px;}
+/* --- ONGLETS (⚠ LIÉ À renderDashboard()/tabBtn() plus bas) --- */
+.tabrow{display:flex;flex-wrap:wrap;gap:6px 26px;align-items:center;border-bottom:1px solid var(--border);margin-bottom:22px;}
+.tabbtn{cursor:pointer;border:none;background:none;font-family:inherit;padding:10px 2px;font-size:13.5px;font-weight:700;border-bottom:2.5px solid transparent;color:var(--text-muted);margin-bottom:-1px;}
+.tabbtn.on{color:var(--heading);border-bottom-color:var(--accent);}
+.tabbadge{display:inline-block;min-width:18px;padding:1px 6px;margin-left:6px;border-radius:999px;background:var(--danger);color:#fff;font-size:11px;font-weight:700;text-align:center;}
+
+.statgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:22px;}
 @media (max-width:640px){.statgrid{grid-template-columns:1fr;}}
 .stattile2{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;box-shadow:var(--shadow);}
 .stattile2 .l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);font-weight:700;margin-bottom:10px;}
 .stattile2 .v{font-family:'Libre Franklin',sans-serif;font-weight:800;font-size:20px;color:var(--heading);}
 
-.section-title{font-size:15px;font-weight:800;color:var(--heading);margin:30px 0 4px;padding-top:22px;border-top:1px solid var(--border);}
-.section-title:first-child{margin-top:0;padding-top:0;border-top:none;}
-.section-sub{font-size:12.5px;color:var(--text-muted);margin:0 0 16px;}
+.block-title{font-size:15px;font-weight:800;color:var(--heading);margin:30px 0 4px;}
+.section-sub{font-size:12.5px;color:var(--text-muted);margin:0 0 14px;}
 
-/* ⚠ ALIGNEMENT DES 3 COLONNES (nom / statut / bouton) : le premier enfant de
+/* ⚠ ALIGNEMENT DES COLONNES (nom / statut / boutons) : le premier enfant de
    .subitem (bloc nom+fichier) prend TOUT l'espace restant ("flex:1"), ce qui
-   pousse systématiquement le badge et le bouton au même endroit sur chaque
-   ligne, quelle que soit la longueur du nom ou du texte du badge — sans ça
-   (ancien "justify-content:space-between"), le badge se décalait ligne par
-   ligne selon la largeur du texte qui le précède. */
-.subitem{border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px;background:var(--surface);}
-.subitem.dashed{border-style:dashed;}
-.subitem>div:first-child{flex:1 1 auto;min-width:0;}
-.subitem .badge{flex-shrink:0;min-width:180px;text-align:center;}
-.subitem .btn{flex-shrink:0;min-width:130px;text-align:center;}
+   pousse le badge et les boutons au même endroit sur chaque ligne. */
+.subitem{border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px;background:var(--surface);flex-wrap:wrap;}
+.subitem>div:first-child{flex:1 1 220px;min-width:0;}
+.subitem-name{font-weight:700;font-size:14px;overflow-wrap:anywhere;}
+.subitem-meta{font-size:12px;color:var(--text-muted);margin-top:2px;overflow-wrap:anywhere;}
+.subitem .badge{flex-shrink:0;min-width:170px;text-align:center;}
+.subitem .btn{flex-shrink:0;min-width:120px;text-align:center;}
 .sublist{display:flex;flex-direction:column;gap:10px;}
 .btn{padding:9px 16px;border-radius:6px;font-size:12.5px;font-weight:700;cursor:pointer;border:none;font-family:inherit;}
 .btn-primary{background:var(--navy);color:#fff;}
 .btn-ghost{background:none;color:var(--text-muted);border:1.5px solid var(--border);}
+.btn[disabled]{opacity:.55;cursor:default;}
+
+/* --- ZONES DE DÉPÔT : une bordure en pointillés = on peut VRAIMENT y glisser
+   un fichier (⚠ LIÉ À bindDrops() plus bas : attributs data-drop-doctype et
+   data-drop-free). Ne jamais mettre de pointillés ailleurs. --- */
+.subitem.dropt{border-style:dashed;}
+.subitem.dropt.filled{border-style:solid;}
+.dropt.drag-over,.freedrop.drag-over{border-color:var(--accent);background:var(--blue-soft);}
+.freebox{border:1px solid var(--border);border-radius:10px;padding:16px;background:var(--surface);}
+.freedrop{border:1.5px dashed var(--border);border-radius:8px;padding:18px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--text-muted);background:var(--surface-2);text-align:center;}
+.busyline{font-size:12.5px;color:var(--text-muted);margin-top:10px;min-height:18px;}
+
+/* --- MESSAGERIE (⚠ LIÉ À renderMessagesTab()/renderThreadHtml() plus bas ;
+   mêmes classes que dans conseiller/index.html) --- */
+.thread{display:flex;flex-direction:column;gap:10px;height:400px;overflow-y:auto;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);}
+.msg{max-width:78%;padding:10px 13px;border-radius:12px;font-size:13.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;}
+.msg.theirs{align-self:flex-start;background:var(--surface);border:1px solid var(--border);}
+.msg.mine{align-self:flex-end;background:var(--navy);color:#fff;}
+.msg-who{font-size:11px;font-weight:700;margin-bottom:3px;color:var(--heading);}
+.msg-meta{font-size:11px;margin-top:5px;opacity:.7;}
+.msgform{display:flex;gap:10px;align-items:flex-end;margin-top:12px;}
+.msgform textarea{flex:1;min-height:64px;resize:vertical;}
+@media (max-width:640px){.msgform{flex-direction:column;align-items:stretch;}}
 </style>
 </head>
 <body>
@@ -78,7 +106,7 @@
    ⚠ Cette liste contient TOUS les documents possibles, mais un client donné
    n'en voit qu'une partie — voir requestedDocTypes() juste en dessous, qui
    filtre selon appState.account.requested_docs (choisi par le conseiller,
-   encart "Documents demandés" du Dossier KYC). --- */
+   encart "Documents demandés" de la fiche du compte). --- */
 var DOC_TYPES = [
   {key:"cni", label:"Carte d'identité"},
   {key:"justificatif_domicile", label:"Justificatif de domicile"},
@@ -96,6 +124,21 @@ var DOC_TYPES = [
   {key:"diligence_lcbft_beneficiaire", label:"Diligence LCB-FT (bénéficiaire effectif)"},
   {key:"justificatif_revenus", label:"Justificatif de revenus"},
   {key:"autre", label:"Autre document"},
+];
+
+/* --- NATURES PROPOSÉES POUR UN ENVOI LIBRE (document non demandé)
+   Simple texte d'affichage : la nature choisie est enregistrée telle quelle
+   dans client_files.nature — aucune contrainte SQL dessus, la liste peut être
+   modifiée librement ici. --- */
+var FREE_NATURES = [
+  "Document signé",
+  "Pièce d'identité",
+  "Justificatif de domicile",
+  "RIB",
+  "Justificatif de revenus ou d'origine des fonds",
+  "Document fiscal",
+  "Document de société (statuts, K-Bis…)",
+  "Autre",
 ];
 
 /* Sous-ensemble de DOC_TYPES réellement demandé à CE client (appState.account
@@ -117,7 +160,7 @@ function accountDisplayName(p){
 }
 
 function esc(s){ return (s||"").toString().replace(/[&<>"']/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
-function fmtDateTime(iso){ try{ return new Date(iso).toLocaleString('fr-FR'); }catch(e){ return iso; } }
+function fmtDateTime(iso){ try{ return new Date(iso).toLocaleString('fr-FR', {dateStyle:"short", timeStyle:"short"}); }catch(e){ return iso; } }
 
 var supa = null;
 function getClient(){
@@ -136,12 +179,19 @@ var appState = {
   account: null, // ligne "profiles" du compte connecté — indépendant de tout dossier KYC
   documents: [],
   reports: [],
-  sharedFiles: [], // fichiers que le conseiller a rendus visibles (table client_files, bucket "library")
+  sharedFiles: [], // fichiers visibles de la base documentaire (table client_files, bucket "library")
   sharedFolders: [], // leurs dossiers (table client_folders), pour afficher le classement
-  tab: "dashboard", // dashboard | documents | bilans
+  messages: [], // fil de discussion avec le conseiller (table client_messages)
+  tab: "dashboard", // dashboard | documents | bilans | messages
   loginError: "",
   loadError: "",
   uploadError: "",
+  busy: "", // texte affiché pendant un envoi libre de fichier
+  freeNature: "",
+  freePrecision: "",
+  msgDraft: "",
+  msgError: "",
+  msgSending: false,
 };
 
 function showToast(msg){
@@ -150,6 +200,86 @@ function showToast(msg){
   setTimeout(function(){ t.classList.remove("show"); }, 2400);
 }
 
+/* --- FILET DE SÉCURITÉ / ERREURS NON PRÉVUES ---
+   Une erreur qu'aucun "try/catch" n'a attrapée ne doit pas passer inaperçue
+   (sinon le bouton cliqué "ne fait rien") : message à l'écran, détail dans la
+   console. Même principe que dans lib/conseiller-app.js. */
+window.addEventListener("unhandledrejection", function(e){
+  console.error("Erreur non gérée :", e.reason);
+  showToast("Une erreur est survenue — réessayez ou actualisez la page.");
+});
+
+/* ==========================================================================
+   STOCKAGE DE FICHIERS : NOMS SÛRS / TAILLE MAXIMALE / OUVERTURE FIABLE
+   ⚠ LIÉ À lib/conseiller-app.js, qui a les mêmes fonctions (mêmes noms, voir
+   là-bas l'explication complète). Supabase Storage refuse les accents et de
+   nombreux caractères dans un chemin ("Invalid key") : le fichier est donc
+   stocké sous un nom aléatoire, et son vrai nom gardé en base (file_name).
+   ========================================================================== */
+var MAX_UPLOAD_MB = 50;
+
+/* Identifiant unique, avec repli pour les navigateurs d'avant 2022 qui n'ont
+   pas crypto.randomUUID() (téléphone non mis à jour) — ⚠ LIÉ À la même
+   fonction dans lib/conseiller-app.js et lib/submit.js. */
+function newUuid(){
+  if(window.crypto && typeof window.crypto.randomUUID==="function") return window.crypto.randomUUID();
+  var b = new Uint8Array(16);
+  window.crypto.getRandomValues(b);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  var h = Array.prototype.map.call(b, function(x){ return ("0"+x.toString(16)).slice(-2); }).join("");
+  return h.slice(0,8)+"-"+h.slice(8,12)+"-"+h.slice(12,16)+"-"+h.slice(16,20)+"-"+h.slice(20);
+}
+
+function storageSafeName(file){
+  var m = (file.name||"").match(/\.[A-Za-z0-9]{1,8}$/);
+  return newUuid() + (m ? m[0].toLowerCase() : "");
+}
+
+function checkUploadable(file){
+  if(!file || !file.size) throw new Error("« "+((file&&file.name)||"fichier")+" » est vide.");
+  if(file.size > MAX_UPLOAD_MB*1024*1024){
+    throw new Error("« "+file.name+" » fait "+(file.size/1048576).toFixed(1)+" Mo : la limite est de "+MAX_UPLOAD_MB+" Mo par fichier.");
+  }
+}
+
+/* Ouvre (downloadName vide) ou télécharge un fichier d'un bucket privé.
+   L'onglet est ouvert tout de suite, dans le clic, puis rempli : sinon les
+   bloqueurs de fenêtres l'empêchent. */
+async function openStoredFile(bucket, path, downloadName){
+  var win = downloadName ? null : window.open("", "_blank");
+  // ⚠ le nom de téléchargement voyage dans l'adresse du lien signé : les
+  // caractères # & ? % + (et ceux interdits dans un nom de fichier Windows)
+  // couperaient ce lien → remplacés par "_". Les accents, eux, passent.
+  if(downloadName) downloadName = String(downloadName).replace(/[#&?%+\\\/:*"<>|]/g, "_");
+  try{
+    var res = await getClient().storage.from(bucket).createSignedUrl(path, 120, downloadName ? { download: downloadName } : undefined);
+    if(res.error) throw new Error(res.error.message);
+    var url = res.data.signedUrl;
+    if(downloadName){
+      var a = document.createElement("a");
+      a.href = url; a.rel = "noopener";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    } else if(win){
+      win.location.href = url;
+    } else {
+      window.location.href = url;
+    }
+  }catch(err){
+    if(win) win.close();
+    showToast("Impossible d'ouvrir le fichier : " + err.message);
+  }
+}
+
+function setBusy(text){
+  appState.busy = text;
+  var b = document.getElementById("busyLine");
+  if(b) b.textContent = text;
+}
+
+/* ==========================================================================
+   AFFICHAGE
+   ========================================================================== */
 function render(){
   document.getElementById("topbar").innerHTML = renderTopbar();
   var app = document.getElementById("app");
@@ -158,6 +288,7 @@ function render(){
   else if(appState.view==="noaccount") app.innerHTML = renderNoAccount();
   else if(appState.view==="dashboard") app.innerHTML = renderDashboard();
   bindEvents();
+  if(appState.view==="dashboard" && appState.tab==="messages") scrollThreadToEnd();
 }
 
 /* ⚠ LIÉ À lib/ivo-theme.css (taille du bandeau/logo réglée là-bas, pas ici)
@@ -208,20 +339,29 @@ function latestDocByType(type){
   return matching[0];
 }
 
+function unreadCount(){
+  return appState.messages.filter(function(m){ return m.from_advisor && !m.read_at; }).length;
+}
+
+function tabBtn(key, label, badge){
+  return '<button class="tabbtn'+(appState.tab===key?" on":"")+'" data-action="tab" data-tab="'+key+'">'+label+
+    (key==="messages" ? '<span id="tabMsgBadge">'+(badge ? '<span class="tabbadge">'+badge+'</span>' : '')+'</span>' : '')+'</button>';
+}
+
 function renderDashboard(){
   var acc = appState.account;
   var myDocTypes = requestedDocTypes();
   var validCount = myDocTypes.filter(function(t){ var d = latestDocByType(t.key); return d && d.status==="valide"; }).length;
   var lastReport = appState.reports.length ? appState.reports[0] : null;
+  var unread = unreadCount();
 
-  /* ⚠ Le bouton "Actualiser" est nécessaire car il n'y a pas de mise à jour
-     en temps réel : si votre conseiller valide un document ou envoie un
-     bilan pendant que cette page est déjà ouverte, il faut ce bouton (ou un
-     rechargement de la page) pour voir le changement — voir loadEverything(). */
-  var html = '<div class="tabrow" style="display:flex;flex-wrap:wrap;gap:14px 26px;align-items:center;border-bottom:1px solid var(--border);margin-bottom:20px">' +
-    tabBtn("dashboard","Tableau de bord") + tabBtn("documents","Mes documents") + tabBtn("bilans","Mes bilans") +
-    '<button type="button" class="btn btn-ghost" style="margin-left:auto" data-action="refresh">↻ Actualiser</button>' +
+  /* ⚠ Pas de mise à jour en temps réel des documents : le bouton "Actualiser"
+     recharge tout. Seule la messagerie se rafraîchit seule (voir tick()). */
+  var html = '<div class="tabrow">' +
+    tabBtn("dashboard","Tableau de bord") + tabBtn("documents","Mes documents") + tabBtn("bilans","Mes bilans") + tabBtn("messages","Messagerie", unread) +
+    '<button type="button" class="btn btn-ghost" style="margin-left:auto;margin-bottom:6px" data-action="refresh">↻ Actualiser</button>' +
   '</div>';
+  if(appState.loadError) html += '<div class="err-box">'+esc(appState.loadError)+'</div>';
 
   if(appState.tab==="dashboard"){
     html += '<div class="eyebrow">Bonjour</div>';
@@ -230,62 +370,16 @@ function renderDashboard(){
     html += '<div class="statgrid">' +
       '<div class="stattile2"><div class="l">Documents fournis</div><div class="v">'+validCount+' <small style="font-size:12px;color:var(--text-muted)">/ '+myDocTypes.length+'</small></div></div>' +
       '<div class="stattile2"><div class="l">Dernier bilan reçu</div><div class="v" style="font-size:15px">'+(lastReport?esc(fmtDateTime(lastReport.sent_at)):'—')+'</div></div>' +
+      '<div class="stattile2"><div class="l">Messages non lus</div><div class="v" id="statUnread">'+unread+'</div></div>' +
     '</div>';
     if(myDocTypes.length && validCount < myDocTypes.length){
       html += '<div class="info"><span class="ic">ℹ️</span><div>Il vous reste des documents à transmettre pour finaliser votre dossier. <a href="#" data-action="goDocuments" style="color:var(--heading);font-weight:700">Voir mes documents</a></div></div>';
     }
+    if(unread){
+      html += '<div class="info"><span class="ic">✉️</span><div>Votre conseiller vous a écrit. <a href="#" data-action="goMessages" style="color:var(--heading);font-weight:700">Lire le message</a></div></div>';
+    }
   } else if(appState.tab==="documents"){
-    html += '<h1 class="step-title" style="margin-bottom:4px">Mes documents</h1>';
-    html += '<p class="section-sub">Transmettez vos justificatifs, votre conseiller les valide directement.</p>';
-    if(appState.uploadError) html += '<div class="err-box">'+esc(appState.uploadError)+'</div>';
-    if(!myDocTypes.length){
-      html += '<div class="empty-state">Aucun document à transmettre pour l\'instant — votre conseiller vous préviendra si besoin.</div>';
-    }
-    html += '<div class="sublist">';
-    myDocTypes.forEach(function(t){
-      var d = latestDocByType(t.key);
-      html += '<div class="subitem'+(!d?' dashed':'')+'">' +
-        '<div><div class="subitem-name" style="font-weight:700;font-size:14px">'+esc(t.label)+'</div>' +
-        '<div class="subitem-meta" style="font-size:12px;color:var(--text-muted);margin-top:2px">'+(d?esc(d.file_name||""):'Aucun fichier transmis')+'</div></div>' +
-        docBadge(d && d.status) +
-        '<label class="btn '+(d&&d.status==="valide"?"btn-ghost":"btn-primary")+'" style="cursor:pointer;flex-shrink:0">'+(d?'Remplacer':'Téléverser')+
-          '<input type="file" data-action="uploadDoc" data-doctype="'+t.key+'" style="display:none">' +
-        '</label>' +
-      '</div>';
-    });
-    html += '</div>';
-
-    /* --- DOCUMENTS PARTAGÉS PAR LE CONSEILLER (lecture seule) --- */
-    if(appState.sharedFiles.length){
-      html += '<h2 style="font-size:15px;margin:28px 0 4px;color:var(--heading)">Documents partagés par votre conseiller</h2>';
-      html += '<p class="section-sub">Ces documents vous ont été transmis par IVO Capital Partners.</p>';
-      // regroupement par dossier (chemin complet), la racine d'abord
-      var folderById = {};
-      appState.sharedFolders.forEach(function(d){ folderById[d.id] = d; });
-      function folderPath(id){
-        var names = [], c = id, g = 0;
-        while(c && folderById[c] && g++ < 60){ names.unshift(folderById[c].name); c = folderById[c].parent_id; }
-        return names.join(" / ");
-      }
-      var groups = {};
-      appState.sharedFiles.forEach(function(f){
-        var p = folderPath(f.folder_id);
-        (groups[p] = groups[p] || []).push(f);
-      });
-      Object.keys(groups).sort(function(a,b){ return a.localeCompare(b, "fr", {numeric:true}); }).forEach(function(path){
-        if(path) html += '<div class="section-sub" style="margin:16px 0 6px;font-weight:700">📁 '+esc(path)+'</div>';
-        html += '<div class="sublist">';
-        groups[path].forEach(function(f){
-          html += '<div class="subitem">' +
-            '<div><div class="subitem-name" style="font-weight:700;font-size:14px">'+esc((f.file_name||"").split("/").pop())+'</div>' +
-            '<div class="subitem-meta" style="font-size:12px;color:var(--text-muted);margin-top:2px">Transmis le '+fmtDateTime(f.uploaded_at)+'</div></div>' +
-            '<button class="btn btn-ghost" data-action="viewShared" data-id="'+esc(f.id)+'">Voir</button>' +
-            '<button class="btn btn-primary" data-action="downloadShared" data-id="'+esc(f.id)+'">Télécharger</button>' +
-          '</div>';
-        });
-        html += '</div>';
-      });
-    }
+    html += renderDocumentsTab(myDocTypes);
   } else if(appState.tab==="bilans"){
     html += '<h1 class="step-title" style="margin-bottom:4px">Mes bilans</h1>';
     html += '<p class="section-sub">Les comptes rendus et bilans transmis par votre conseiller.</p>';
@@ -295,24 +389,234 @@ function renderDashboard(){
       html += '<div class="sublist">';
       appState.reports.forEach(function(r){
         html += '<div class="subitem">' +
-          '<div><div class="subitem-name" style="font-weight:700;font-size:14px">'+esc(r.title)+'</div>' +
-          '<div class="subitem-meta" style="font-size:12px;color:var(--text-muted);margin-top:2px">Transmis le '+fmtDateTime(r.sent_at)+'</div></div>' +
+          '<div><div class="subitem-name">'+esc(r.title)+'</div>' +
+          '<div class="subitem-meta">Transmis le '+fmtDateTime(r.sent_at)+'</div></div>' +
+          '<button class="btn btn-ghost" data-action="viewReport" data-id="'+esc(r.id)+'">Voir</button>' +
           '<button class="btn btn-primary" data-action="downloadReport" data-id="'+esc(r.id)+'">Télécharger</button>' +
         '</div>';
       });
       html += '</div>';
     }
+  } else if(appState.tab==="messages"){
+    html += renderMessagesTab();
   }
 
   return '<div class="card wide">' + html + '</div>';
 }
 
-function tabBtn(key, label){
-  var on = appState.tab===key;
-  return '<button data-action="tab" data-tab="'+key+'" style="cursor:pointer;border:none;background:none;font-family:inherit;padding:10px 2px;font-size:13.5px;font-weight:700;border-bottom:2.5px solid '+(on?'var(--accent)':'transparent')+';color:'+(on?'var(--heading)':'var(--text-muted)')+'">'+label+'</button>';
+/* ==========================================================================
+   ONGLET "MES DOCUMENTS" : documents demandés / envoi libre / documents partagés
+   ========================================================================== */
+function fileRow(f, sub){
+  return '<div class="subitem">' +
+    '<div><div class="subitem-name">'+esc((f.file_name||"").split("/").pop())+'</div>' +
+    '<div class="subitem-meta">'+sub+'</div></div>' +
+    '<button class="btn btn-ghost" data-action="viewShared" data-id="'+esc(f.id)+'">Voir</button>' +
+    '<button class="btn btn-primary" data-action="downloadShared" data-id="'+esc(f.id)+'">Télécharger</button>' +
+  '</div>';
 }
 
-/* ---------- data loading ---------- */
+function renderDocumentsTab(myDocTypes){
+  var html = '<h1 class="step-title" style="margin-bottom:4px">Mes documents</h1>';
+  if(appState.uploadError) html += '<div class="err-box">'+esc(appState.uploadError)+'</div>';
+
+  /* --- 1) DOCUMENTS DEMANDÉS PAR LE CONSEILLER ---
+     Chaque ligne est une vraie zone de dépôt (data-drop-doctype). */
+  html += '<div class="block-title" style="margin-top:14px">Documents demandés</div>';
+  html += '<p class="section-sub">Glissez le fichier sur sa ligne, ou cliquez sur le bouton. Votre conseiller le valide ensuite.</p>';
+  if(!myDocTypes.length){
+    html += '<div class="empty-state" style="padding:18px">Aucun document ne vous est demandé pour l\'instant.</div>';
+  } else {
+    html += '<div class="sublist">';
+    myDocTypes.forEach(function(t){
+      var d = latestDocByType(t.key);
+      html += '<div class="subitem dropt'+(d?' filled':'')+'" data-drop-doctype="'+t.key+'">' +
+        '<div><div class="subitem-name">'+esc(t.label)+'</div>' +
+        '<div class="subitem-meta">'+(d?esc(d.file_name||""):'Aucun fichier transmis')+'</div></div>' +
+        docBadge(d && d.status) +
+        '<label class="btn '+(d&&d.status==="valide"?"btn-ghost":"btn-primary")+'" style="cursor:pointer">'+(d?'Remplacer':'Téléverser')+
+          '<input type="file" data-action="uploadDoc" data-doctype="'+t.key+'" style="display:none">' +
+        '</label>' +
+      '</div>';
+    });
+    html += '</div>';
+  }
+
+  /* --- 2) ENVOI LIBRE : un document que le conseiller n'a pas demandé ---
+     ⚠ LIÉ À supabase/schema-v2-portail-client.sql section 12 et à
+     uploadFreeDocument() plus bas. */
+  html += '<div class="block-title">Envoyer un autre document</div>';
+  html += '<p class="section-sub">Un document signé, une pièce complémentaire… Indiquez sa nature puis déposez le fichier : il arrive directement chez votre conseiller.</p>';
+  html += '<div class="freebox">' +
+    '<div class="field-row">' +
+      '<div class="field"><label class="flabel">Nature du document</label><select id="freeNature" data-action="freeNatureChange">' +
+        '<option value=""'+(appState.freeNature?'':' selected')+'>Choisir…</option>' +
+        FREE_NATURES.map(function(n){ return '<option value="'+esc(n)+'"'+(appState.freeNature===n?" selected":"")+'>'+esc(n)+'</option>'; }).join('') +
+      '</select></div>' +
+      '<div class="field"><label class="flabel">Précision <span class="opt">(optionnel)</span></label><input type="text" id="freePrecision" data-action="freePrecisionInput" placeholder="Ex : mandat signé le 12/11" value="'+esc(appState.freePrecision)+'"></div>' +
+    '</div>' +
+    '<div class="freedrop" data-drop-free="1">' +
+      '<span>Glissez votre fichier ici, ou</span>' +
+      '<label class="btn btn-primary" style="cursor:pointer">Choisir un fichier<input type="file" data-action="freeUpload" style="display:none"></label>' +
+    '</div>' +
+    '<div class="busyline" id="busyLine">'+esc(appState.busy)+'</div>' +
+  '</div>';
+
+  /* --- 3) FICHIERS DE LA BASE DOCUMENTAIRE VISIBLES PAR LE CLIENT ---
+     Deux groupes : ceux qu'il a envoyés lui-même (uploaded_by_client) et ceux
+     partagés par le conseiller. Un fichier que le conseiller classe "en
+     interne" disparaît d'ici (la RLS ne le renvoie plus). */
+  var mine = appState.sharedFiles.filter(function(f){ return f.uploaded_by_client; });
+  var theirs = appState.sharedFiles.filter(function(f){ return !f.uploaded_by_client; });
+
+  if(mine.length){
+    html += '<div class="block-title">Vos envois</div>';
+    html += '<p class="section-sub">Documents que vous avez transmis. Ils quittent cette liste une fois classés par votre conseiller.</p>';
+    html += '<div class="sublist">' + mine.map(function(f){
+      return fileRow(f, (f.nature ? esc(f.nature)+' · ' : '') + 'envoyé le '+fmtDateTime(f.uploaded_at));
+    }).join('') + '</div>';
+  }
+
+  if(theirs.length){
+    html += '<div class="block-title">Documents partagés par votre conseiller</div>';
+    html += '<p class="section-sub">Ces documents vous ont été transmis par IVO Capital Partners.</p>';
+    var folderById = {};
+    appState.sharedFolders.forEach(function(d){ folderById[d.id] = d; });
+    var folderPath = function(id){
+      var names = [], c = id, g = 0;
+      while(c && folderById[c] && g++ < 60){ names.unshift(folderById[c].name); c = folderById[c].parent_id; }
+      return names.join(" / ");
+    };
+    var groups = {};
+    theirs.forEach(function(f){
+      var pth = folderPath(f.folder_id);
+      (groups[pth] = groups[pth] || []).push(f);
+    });
+    Object.keys(groups).sort(function(a,b){ return a.localeCompare(b, "fr", {numeric:true}); }).forEach(function(path){
+      if(path) html += '<div class="section-sub" style="margin:16px 0 6px;font-weight:700">📁 '+esc(path)+'</div>';
+      html += '<div class="sublist">' + groups[path].map(function(f){
+        return fileRow(f, 'Transmis le '+fmtDateTime(f.uploaded_at));
+      }).join('') + '</div>';
+    });
+  }
+  return html;
+}
+
+/* ==========================================================================
+   MESSAGERIE AVEC LE CONSEILLER
+   ⚠ LIÉ À supabase/schema-v2-portail-client.sql section 13 (table
+   client_messages + fonction mark_messages_read) et à lib/conseiller-app.js
+   (onglet "Messages" de la fiche compte). from_advisor = true : écrit par le
+   conseiller. Le fil se rafraîchit seul toutes les 20 secondes (tick()).
+   ========================================================================== */
+function renderThreadHtml(){
+  if(!appState.messages.length){
+    return '<div class="empty-state" style="margin:auto">Aucun message pour l\'instant. Écrivez à votre conseiller ci-dessous.</div>';
+  }
+  return appState.messages.map(function(m){
+    var mine = !m.from_advisor;
+    return '<div class="msg '+(mine?"mine":"theirs")+'">' +
+      (mine ? '' : '<div class="msg-who">Votre conseiller</div>') +
+      esc(m.body) +
+      '<div class="msg-meta">'+fmtDateTime(m.created_at)+(mine && m.read_at ? ' · lu' : '')+'</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderMessagesTab(){
+  var html = '<h1 class="step-title" style="margin-bottom:4px">Messagerie</h1>';
+  html += '<p class="section-sub">Posez vos questions à votre conseiller IVO Capital Partners. Il vous répond ici.</p>';
+  html += '<div class="thread" id="msgThread">'+renderThreadHtml()+'</div>';
+  html += '<div class="msgform">' +
+    '<textarea id="msgInput" data-action="msgDraftInput" maxlength="4000" placeholder="Votre message…">'+esc(appState.msgDraft)+'</textarea>' +
+    '<button type="button" class="btn btn-primary" data-action="sendMessage"'+(appState.msgSending?" disabled":"")+'>Envoyer</button>' +
+  '</div>';
+  if(appState.msgError) html += '<div class="err-box">'+esc(appState.msgError)+'</div>';
+  html += '<p class="section-sub" style="margin:10px 0 0">Astuce : Ctrl + Entrée envoie le message.</p>';
+  return html;
+}
+
+function scrollThreadToEnd(){
+  var t = document.getElementById("msgThread");
+  if(t) t.scrollTop = t.scrollHeight;
+}
+
+function updateUnreadDom(){
+  var n = unreadCount();
+  var b = document.getElementById("tabMsgBadge");
+  if(b) b.innerHTML = n ? '<span class="tabbadge">'+n+'</span>' : '';
+  var st = document.getElementById("statUnread");
+  if(st) st.textContent = n;
+}
+
+async function loadMessages(){
+  var client = getClient();
+  var uid = appState.session.user.id;
+  var res = await client.from("client_messages").select("*").eq("client_id", uid).order("created_at",{ascending:false}).range(0, 299);
+  if(res.error) throw new Error(res.error.message);
+  appState.messages = (res.data||[]).slice().reverse();
+}
+
+/* Marque comme lus les messages du conseiller, quand l'onglet est affiché. */
+async function markMessagesRead(){
+  if(!unreadCount()) return;
+  var uid = appState.session.user.id;
+  var res = await getClient().rpc("mark_messages_read", { p_client: uid });
+  if(res && res.error) return;
+  var now = new Date().toISOString();
+  appState.messages.forEach(function(m){ if(m.from_advisor && !m.read_at) m.read_at = now; });
+  updateUnreadDom();
+}
+
+async function sendMessage(){
+  var body = (appState.msgDraft||"").trim();
+  if(!body){ appState.msgError = "Écrivez un message avant d'envoyer."; render(); return; }
+  if(appState.msgSending) return;
+  appState.msgError = "";
+  appState.msgSending = true;
+  render();
+  try{
+    var uid = appState.session.user.id;
+    var ins = await getClient().from("client_messages").insert({ client_id: uid, sender_id: uid, from_advisor: false, body: body });
+    if(ins.error) throw new Error(ins.error.message);
+    appState.msgDraft = "";
+    await loadMessages();
+  }catch(err){
+    appState.msgError = "Message non envoyé : " + err.message;
+  }
+  appState.msgSending = false;
+  render();
+}
+
+/* Rafraîchissement périodique de la messagerie SEULEMENT (jamais de render()
+   complet ici : il effacerait ce que le client est en train de saisir). */
+var tickTimer = null;
+var ticking = false; // un passage à la fois, même si le réseau est lent
+async function tick(){
+  if(ticking || !appState.session || appState.view!=="dashboard") return;
+  ticking = true;
+  try{
+    var before = appState.messages.length;
+    await loadMessages();
+    if(appState.tab==="messages"){
+      var t = document.getElementById("msgThread");
+      var nearEnd = t ? (t.scrollHeight - t.scrollTop - t.clientHeight < 60) : true;
+      if(t) t.innerHTML = renderThreadHtml();
+      if(t && (nearEnd || appState.messages.length > before)) scrollThreadToEnd();
+      await markMessagesRead();
+    }
+    updateUnreadDom();
+  }catch(e){ /* réseau indisponible : on réessaiera au prochain passage */ }
+  ticking = false;
+}
+function startTick(){
+  if(tickTimer) clearInterval(tickTimer);
+  tickTimer = setInterval(tick, 20000);
+}
+
+/* ==========================================================================
+   CHARGEMENT DES DONNÉES
+   ========================================================================== */
 async function init(){
   try{
     var client = getClient();
@@ -320,6 +624,7 @@ async function init(){
     appState.session = data.session;
     if(data.session){
       await loadEverything();
+      startTick();
     } else {
       appState.view = "login";
     }
@@ -341,13 +646,14 @@ async function init(){
 async function loadEverything(){
   var client = getClient();
   var uid = appState.session.user.id;
+  appState.loadError = "";
   var { data: profile, error } = await client.from("profiles").select("*").eq("id", uid).maybeSingle();
   if(error){ appState.loadError = error.message; appState.view = "dashboard"; return; }
   if(!profile){ appState.view = "noaccount"; return; }
   appState.account = profile;
   appState.view = "dashboard";
 
-  var [{ data: docs }, { data: reports }, { data: shared }, { data: sharedFolders }] = await Promise.all([
+  var res = await Promise.all([
     client.from("client_documents").select("*").eq("client_id", uid).order("uploaded_at",{ascending:false}),
     client.from("client_reports").select("*").eq("client_id", uid).order("sent_at",{ascending:false}),
     // ⚠ la RLS (client_files, supabase/schema-v2-portail-client.sql section 10)
@@ -356,37 +662,107 @@ async function loadEverything(){
     client.from("client_files").select("*").eq("client_id", uid).eq("visibility","client").order("uploaded_at",{ascending:false}),
     client.from("client_folders").select("*").eq("client_id", uid).eq("visibility","client"),
   ]);
-  appState.documents = docs || [];
-  appState.reports = reports || [];
-  appState.sharedFiles = shared || [];
-  appState.sharedFolders = sharedFolders || [];
+  var firstErr = res.filter(function(r){ return r.error; })[0];
+  if(firstErr) appState.loadError = "Certaines données n'ont pas pu être chargées : " + firstErr.error.message;
+  appState.documents = res[0].data || [];
+  appState.reports = res[1].data || [];
+  appState.sharedFiles = res[2].data || [];
+  appState.sharedFolders = res[3].data || [];
+  try{ await loadMessages(); }catch(e){ appState.messages = []; }
 }
 
+/* ==========================================================================
+   ÉVÉNEMENTS
+   ========================================================================== */
 function bindEvents(){
   var app = document.getElementById("app");
   var topbar = document.getElementById("topbar");
 
   [app, topbar].forEach(function(root){
     root.querySelectorAll("[data-action]").forEach(function(el){
-      var evt = (el.tagName==="INPUT" && el.type==="file") ? "change" : "click";
+      if(el.__ivoBound) return; // jamais deux écouteurs sur le même élément
+      el.__ivoBound = true;
+      var isFile = el.tagName==="INPUT" && el.type==="file";
+      var evt = (isFile || el.tagName==="SELECT") ? "change"
+        : (el.tagName==="TEXTAREA" || el.tagName==="INPUT") ? "input"
+        : "click";
       el.addEventListener(evt, function(e){
         var action = el.getAttribute("data-action");
         if(action==="login"){ e.preventDefault(); doLogin(); return; }
-        if(action==="logout"){ getClient().auth.signOut(); appState.view="login"; render(); return; }
-        if(action==="tab"){ appState.tab = el.getAttribute("data-tab"); render(); return; }
-        if(action==="refresh"){ loadEverything().then(render); return; }
-        if(action==="goDocuments"){ e.preventDefault(); appState.tab = "documents"; render(); return; }
-        if(action==="uploadDoc"){
-          if(el.files && el.files[0]) uploadDocument(el.getAttribute("data-doctype"), el.files[0]);
+        if(action==="logout"){ getClient().auth.signOut(); if(tickTimer) clearInterval(tickTimer); appState.view="login"; appState.messages=[]; render(); return; }
+        if(action==="tab"){
+          appState.tab = el.getAttribute("data-tab");
+          render();
+          if(appState.tab==="messages") markMessagesRead();
           return;
         }
-        if(action==="downloadReport"){ downloadReport(el.getAttribute("data-id")); return; }
+        if(action==="refresh"){ loadEverything().then(function(){ render(); if(appState.tab==="messages") markMessagesRead(); }); return; }
+        if(action==="goDocuments"){ e.preventDefault(); appState.tab = "documents"; render(); return; }
+        if(action==="goMessages"){ e.preventDefault(); appState.tab = "messages"; render(); markMessagesRead(); return; }
+        if(action==="uploadDoc"){
+          var f1 = el.files && el.files[0];
+          el.value = "";
+          if(f1) uploadDocument(el.getAttribute("data-doctype"), f1);
+          return;
+        }
+        if(action==="freeNatureChange"){ appState.freeNature = el.value; return; }
+        if(action==="freePrecisionInput"){ appState.freePrecision = el.value; return; }
+        if(action==="freeUpload"){
+          var f2 = el.files && el.files[0];
+          el.value = "";
+          if(f2) uploadFreeDocument(f2);
+          return;
+        }
+        if(action==="viewReport"){ openReport(el.getAttribute("data-id"), false); return; }
+        if(action==="downloadReport"){ openReport(el.getAttribute("data-id"), true); return; }
         if(action==="viewShared"){ openShared(el.getAttribute("data-id"), false); return; }
         if(action==="downloadShared"){ openShared(el.getAttribute("data-id"), true); return; }
+        if(action==="msgDraftInput"){ appState.msgDraft = el.value; return; }
+        if(action==="sendMessage"){ sendMessage(); return; }
       });
     });
   });
+
+  var mi = document.getElementById("msgInput");
+  if(mi && !mi.__keyBound){
+    mi.__keyBound = true;
+    mi.addEventListener("keydown", function(e){
+      if(e.key==="Enter" && (e.ctrlKey || e.metaKey)){ e.preventDefault(); sendMessage(); }
+    });
+  }
+  var le = document.getElementById("loginPassword");
+  if(le && !le.__keyBound){
+    le.__keyBound = true;
+    le.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); doLogin(); } });
+  }
+  bindDrops();
 }
+
+/* --- GLISSER-DÉPOSER : les lignes de documents demandés (data-drop-doctype)
+   et la zone d'envoi libre (data-drop-free) acceptent un fichier venu de
+   l'ordinateur. --- */
+function bindDrops(){
+  document.querySelectorAll("[data-drop-doctype],[data-drop-free]").forEach(function(el){
+    if(el.__dropBound) return;
+    el.__dropBound = true;
+    el.__dc = 0;
+    el.addEventListener("dragenter", function(e){ e.preventDefault(); el.__dc++; el.classList.add("drag-over"); });
+    el.addEventListener("dragover", function(e){ e.preventDefault(); });
+    el.addEventListener("dragleave", function(){ el.__dc--; if(el.__dc<=0){ el.__dc = 0; el.classList.remove("drag-over"); } });
+    el.addEventListener("drop", function(e){
+      e.preventDefault(); e.stopPropagation();
+      el.__dc = 0; el.classList.remove("drag-over");
+      var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if(!file) return;
+      var type = el.getAttribute("data-drop-doctype");
+      if(type) uploadDocument(type, file);
+      else uploadFreeDocument(file);
+    });
+  });
+}
+/* Un fichier lâché à côté d'une zone ne doit pas remplacer la page par le fichier. */
+window.addEventListener("dragover", function(e){ e.preventDefault(); });
+window.addEventListener("drop", function(e){ e.preventDefault(); });
 
 async function doLogin(){
   appState.loginError = "";
@@ -399,6 +775,7 @@ async function doLogin(){
     if(error) throw new Error(error.message);
     appState.session = data.session;
     await loadEverything();
+    startTick();
     render();
   }catch(err){
     appState.loginError = err.message;
@@ -406,19 +783,24 @@ async function doLogin(){
   }
 }
 
+/* ==========================================================================
+   ENVOIS DE FICHIERS
+   ========================================================================== */
 async function uploadDocument(docType, file){
   appState.uploadError = "";
   try{
+    checkUploadable(file);
     var client = getClient();
     var acc = appState.account;
+    showToast("Envoi en cours…");
     // ⚠ CONVENTION DE CHEMIN LIÉE AUX POLICIES SQL (supabase/schema-v2-portail-client.sql,
     // section 9, policies "client-documents ..." qui lisent
     // (storage.foldername(name))[1]) ET à la même convention utilisée côté
-    // conseiller dans lib/conseiller-app.js (fonction advisorUploadDocument)
-    // — ne pas changer la forme "<id du COMPTE>/..." sans mettre à jour les
-    // policies SQL.
-    var path = acc.id + "/" + docType + "-" + Date.now() + "-" + file.name;
-    var upload = await client.storage.from("client-documents").upload(path, file, { upsert:false });
+    // conseiller dans lib/conseiller-app.js (fonction advisorUploadDocument) :
+    // "<id du COMPTE>/<nom aléatoire>". Jamais le vrai nom du fichier dans le
+    // chemin (voir storageSafeName()).
+    var path = acc.id + "/" + storageSafeName(file);
+    var upload = await client.storage.from("client-documents").upload(path, file, { upsert:false, contentType: file.type || undefined });
     if(upload.error) throw new Error(upload.error.message);
     var insert = await client.from("client_documents").insert({
       client_id: acc.id,
@@ -433,38 +815,77 @@ async function uploadDocument(docType, file){
     showToast("Document transmis ✓");
     render();
   }catch(err){
-    appState.uploadError = err.message;
+    appState.uploadError = "Envoi impossible : " + err.message;
+    render();
+  }
+}
+
+/* Envoi libre : le fichier va dans la base documentaire, zone visible du
+   client, marqué "déposé par le client" avec sa nature.
+   ⚠ LIÉ À supabase/schema-v2-portail-client.sql section 12 : la policy
+   n'accepte que client_id = soi, visibility = 'client', folder_id vide,
+   uploaded_by_client = true et un chemin commençant par "<son id>/". */
+async function uploadFreeDocument(file){
+  appState.uploadError = "";
+  if(!appState.freeNature){
+    appState.uploadError = "Choisissez d'abord la nature du document.";
+    render();
+    return;
+  }
+  var precision = (appState.freePrecision||"").trim();
+  if(appState.freeNature==="Autre" && !precision){
+    appState.uploadError = "Précisez de quel document il s'agit (champ « Précision »).";
+    render();
+    return;
+  }
+  try{
+    checkUploadable(file);
+    var client = getClient();
+    var uid = appState.session.user.id;
+    setBusy("Envoi de « "+file.name+" »…");
+    var path = uid + "/" + storageSafeName(file);
+    var up = await client.storage.from("library").upload(path, file, { upsert:false, contentType: file.type || undefined });
+    if(up.error) throw new Error(up.error.message);
+    var ins = await client.from("client_files").insert({
+      client_id: uid,
+      visibility: "client",
+      folder_id: null,
+      file_name: file.name,
+      storage_path: path,
+      size_bytes: file.size,
+      mime_type: file.type || null,
+      uploaded_by: uid,
+      uploaded_by_client: true,
+      nature: appState.freeNature + (precision ? " — " + precision : ""),
+    });
+    if(ins.error) throw new Error(ins.error.message);
+    appState.freeNature = "";
+    appState.freePrecision = "";
+    appState.busy = "";
+    var res = await client.from("client_files").select("*").eq("client_id", uid).eq("visibility","client").order("uploaded_at",{ascending:false});
+    appState.sharedFiles = res.data || [];
+    showToast("Document envoyé à votre conseiller ✓");
+    render();
+  }catch(err){
+    appState.busy = "";
+    appState.uploadError = "Envoi impossible : " + err.message;
     render();
   }
 }
 
 /* ⚠ Le bucket "library" est répété dans lib/conseiller-app.js — voir
    supabase/schema-v2-portail-client.sql section 10. */
-async function openShared(id, download){
+function openShared(id, download){
   var f = appState.sharedFiles.filter(function(x){ return x.id===id; })[0];
   if(!f) return;
-  try{
-    var client = getClient();
-    var base = (f.file_name||"fichier").split("/").pop();
-    var res = await client.storage.from("library").createSignedUrl(f.storage_path, 120, download ? { download: base } : undefined);
-    if(res.error) throw new Error(res.error.message);
-    window.open(res.data.signedUrl, "_blank");
-  }catch(err){
-    showToast("Impossible d'ouvrir le fichier : " + err.message);
-  }
+  var base = (f.file_name||"fichier").split("/").pop();
+  return openStoredFile("library", f.storage_path, download ? base : null);
 }
 
-async function downloadReport(id){
+function openReport(id, download){
   var report = appState.reports.filter(function(r){ return r.id===id; })[0];
   if(!report) return;
-  try{
-    var client = getClient();
-    var { data, error } = await client.storage.from("client-reports").createSignedUrl(report.storage_path, 120);
-    if(error) throw new Error(error.message);
-    window.open(data.signedUrl, "_blank");
-  }catch(err){
-    showToast("Impossible d'ouvrir le fichier : " + err.message);
-  }
+  return openStoredFile("client-reports", report.storage_path, download ? (report.title||"bilan") : null);
 }
 
 init();
