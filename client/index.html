@@ -133,6 +133,7 @@ function rollQuiz(key){
 function defaultState(){
   return {
     step:-1,
+    sub:0, // écran en cours DANS l'étape (une question par écran) — voir screensFor() / currentScreen()
     sentAt:null,
     pdfDownloaded:false,
     advisorEmail:"",
@@ -162,7 +163,6 @@ function defaultState(){
       impot:""},
 
     instruments:(function(){var o={};INSTRUMENTS.forEach(function(i){o[i.k]={connait:null,ops:null,declared:null,quizIdx:null,quizOrder:null,quizSelected:null};});return o;})(),
-    instrIdx:0, // écran en cours DANS l'étape "Connaissances" : 0..8 = un instrument par écran, 9 = questions oui/non finales
     gereSeul:null, gereSeulDepuis:"", mandatGestion:null, experiencePro:null, gains:null, pertes:null, conscienceRisque:null,
 
     objOrder: ["valoriser","completer","diversifier","securite","fiscalite","performance","succession"],
@@ -178,11 +178,49 @@ function defaultState(){
   };
 }
 
-var state = load() || defaultState();
+/* --- REPRISE D'UN BROUILLON / FUSION AVEC LES VALEURS PAR DÉFAUT ---
+   Le brouillon vient du navigateur du client (localStorage) : il peut dater
+   d'une ancienne version du questionnaire, ou être incomplet. On part donc
+   TOUJOURS d'un état complet (defaultState()) et on y recopie seulement les
+   valeurs enregistrées dont la forme est la bonne. Sans cela, un champ manquant
+   (ex : state.ppe absent) ferait planter l'affichage : page blanche pour le
+   client, sans message. Un champ inconnu du brouillon est simplement ignoré. */
+function mergeDefaults(def, saved){
+  if(!saved || typeof saved!=="object" || Array.isArray(saved)) return def;
+  Object.keys(def).forEach(function(k){
+    var d = def[k], s = saved[k];
+    if(s===undefined) return; // absent du brouillon → valeur par défaut
+    if(d && typeof d==="object" && !Array.isArray(d)){
+      if(s && typeof s==="object" && !Array.isArray(s)) def[k] = mergeDefaults(d, s);
+    } else if(Array.isArray(d)){
+      if(Array.isArray(s)) def[k] = s;
+    } else {
+      def[k] = s;
+    }
+  });
+  return def;
+}
+/* Un classement d'objectifs n'est repris que s'il contient exactement les
+   mêmes clés que le classement par défaut (sinon : libellés "undefined"). */
+function samePermutation(a, b){
+  return Array.isArray(a) && a.length===b.length && b.every(function(k){ return a.indexOf(k) > -1; });
+}
+
+var state = mergeDefaults(defaultState(), load());
+(function(){
+  var d = defaultState();
+  if(!samePermutation(state.objOrder, d.objOrder)) state.objOrder = d.objOrder;
+  if(!samePermutation(state.objOrderMorale, d.objOrderMorale)) state.objOrderMorale = d.objOrderMorale;
+  if(state.personType!=="physique" && state.personType!=="morale") state.personType = "physique";
+  if(typeof state.step!=="number" || !(state.step >= -1) || state.step > STEPS.length-1) state.step = -1;
+  state.step = Math.floor(state.step);
+})();
 if(typeof state.sentAt === "undefined"){ state.sentAt = null; }
 if(typeof state.pdfDownloaded === "undefined"){ state.pdfDownloaded = false; }
 if(typeof state.advisorEmail === "undefined"){ state.advisorEmail = ""; }
-if(typeof state.instrIdx === "undefined"){ state.instrIdx = 0; }
+// Brouillon enregistré avec l'ancienne version (une page par étape) : on
+// reprend au premier écran de l'étape où la personne s'était arrêtée.
+if(typeof state.sub !== "number"){ state.sub = 0; }
 INSTRUMENTS.forEach(function(ins){
   var v = state.instruments[ins.k];
   if(!v){ state.instruments[ins.k] = {connait:null,ops:null,declared:null,quizIdx:null,quizOrder:null,quizSelected:null}; return; }
@@ -227,7 +265,12 @@ function showToast(msg){
   setTimeout(function(){ t.classList.remove("show"); }, 2200);
 }
 
-/* ---------- render dispatch ---------- */
+/* ==========================================================================
+   MOTEUR D'AFFICHAGE / RENDER PRINCIPAL / AIGUILLAGE ÉCRAN D'ACCUEIL - ÉTAPES
+   render() redessine toute la page à partir de "state". resetScroll = true
+   quand on change d'écran (retour en haut de page), false quand on reste sur
+   le même écran (une réponse vient d'être cochée).
+   ========================================================================== */
 var topbarPainted = false;
 function render(resetScroll){
   if(!topbarPainted){
@@ -243,6 +286,16 @@ function render(resetScroll){
   }
   bindEvents();
   if(resetScroll){ window.scrollTo(0,0); } else { window.scrollTo(0, savedY); }
+  // Nouvel écran avec un champ à remplir : le curseur s'y place tout seul —
+  // uniquement à la souris (sur téléphone, cela ouvrirait le clavier à chaque
+  // écran), et jamais sur les longues pages Patrimoine / Bilan.
+  if(resetScroll && state.step >= 0){
+    var k = STEPS[state.step].key;
+    if(k!=="patrimoine" && k!=="recap" && window.matchMedia && window.matchMedia("(pointer:fine)").matches){
+      var first = app.querySelector(".card input[data-bind]:not([type=date]), .card textarea[data-bind]");
+      if(first){ try{ first.focus({preventScroll:true}); }catch(e){} }
+    }
+  }
 }
 
 /* ⚠ LIÉ À lib/ivo-theme.css (#topbar/.brand-badge — taille du logo réglée
@@ -285,7 +338,6 @@ function isStepComplete(i){
 }
 
 function progressBar(){
-  var pct = (state.step/(STEPS.length-1))*100;
   var html = '<div class="progress">';
   STEPS.forEach(function(s,i){
     var complete = isStepComplete(i);
@@ -297,7 +349,10 @@ function progressBar(){
       '<div class="pdot">'+mark+'</div><div class="plabel">'+s.label+'</div></button>';
   });
   html += '</div>';
-  html += '<div class="pbar-track"><div class="pbar-fill" style="width:'+pct+'%"></div></div><div style="height:22px"></div>';
+  // ⚠ Une seule barre d'avancement à l'écran : celle de la question en cours,
+  // DANS la carte (.iprog). L'ancienne barre fine sous les pastilles d'étapes
+  // a été retirée : les deux barres l'une au-dessus de l'autre faisaient doublon.
+  // (l'espace sous les pastilles vient du margin-bottom de .progress, lib/ivo-theme.css)
   return html;
 }
 
@@ -327,144 +382,299 @@ function renderIntro(){
   '</div>';
 }
 
-function renderStep(i){
-  switch(STEPS[i].key){
-    case "identite": return stepIdentite();
-    case "vigilance": return stepVigilance();
-    case "patrimoine": return stepPatrimoine();
-    case "connaissance": return stepConnaissance();
-    case "objectifs": return stepObjectifs();
-    case "durabilite": return stepDurabilite();
-    case "profil": return stepProfil();
-    case "recap": return stepRecap();
+/* ==========================================================================
+   MOTEUR "UNE QUESTION PAR ÉCRAN" / SOUS-ÉCRANS DE CHAQUE ÉTAPE / NAVIGATION
+   Le questionnaire garde ses 7 étapes (barre du haut), mais chaque étape est
+   découpée en ÉCRANS : une question (ou un petit groupe de champs liés) par
+   écran, comme l'étape "Connaissances". Seules exceptions, affichées d'un
+   bloc : "Patrimoine" (tableau de montants) et le "Bilan" final.
+
+   - screensFor(clé d'étape) renvoie la liste des écrans VISIBLES de l'étape
+     (certains dépendent des réponses : société / particulier, marié ou non…).
+   - state.sub = numéro de l'écran en cours DANS l'étape (0 = premier).
+   - goNext() / goPrev() passent à l'écran suivant / précédent, et changent
+     d'étape en bout de liste (en arrivant par "Précédent" on tombe sur le
+     DERNIER écran de l'étape d'avant).
+   - Un écran marqué "auto" passe tout seul à la suite dès qu'une réponse est
+     choisie (questions à choix unique). Pour couper ce comportement partout :
+     mettre AUTO_ADVANCE à false ci-dessous.
+
+   ⚠ LIÉ À lib/pdf-fill.js et lib/submit.js : ce découpage ne change QUE
+   l'affichage. Les noms des champs de "state" (data-bind / data-path) sont
+   strictement les mêmes qu'avant — voir la note sur defaultState().
+   ⚠ Version précédente (toutes les questions d'une étape sur une page) :
+   client/index-version-classique.html. Pour y revenir, renommer ce fichier-là
+   en index.html.
+   ========================================================================== */
+var AUTO_ADVANCE = true;
+var AUTO_DELAY_MS = 280; // le temps de voir sa réponse surlignée avant de passer à la suite
+
+function screensFor(stepKey){
+  switch(stepKey){
+    case "identite": return screensIdentite();
+    case "vigilance": return screensVigilance();
+    case "connaissance": return screensConnaissance();
+    case "objectifs": return screensObjectifs();
+    case "durabilite": return screensDurabilite();
+    case "profil": return screensProfil();
   }
+  return [{id:stepKey}]; // patrimoine, recap : un seul bloc, rendu par leur propre fonction
 }
 
+function currentScreens(){ return screensFor(STEPS[state.step].key); }
+
+/* Écran en cours, en rattrapant un numéro devenu trop grand (une réponse
+   modifiée peut retirer des écrans conditionnels). */
+function currentScreen(){
+  var list = currentScreens();
+  if(!(state.sub >= 0)) state.sub = 0;
+  if(state.sub > list.length-1) state.sub = list.length-1;
+  return list[state.sub];
+}
+
+function renderStep(i){
+  var key = STEPS[i].key;
+  if(key==="patrimoine") return stepPatrimoine();
+  if(key==="recap") return stepRecap();
+
+  var list = screensFor(key);
+  var sc = currentScreen();
+  var html = '<div class="eyebrow">Étape '+(i+1)+' / 7 · '+STEPS[i].label+'</div>';
+  if(list.length > 1){
+    html += '<div class="iprog"><span>'+(sc.counter||"Question")+' '+(state.sub+1)+' sur '+list.length+'</span>' +
+      '<div class="iprog-bar"><i style="width:'+Math.round(((state.sub+1)/list.length)*100)+'%"></i></div></div>';
+  }
+  html += '<h2 class="step-title">'+sc.title+'</h2>';
+  if(sc.intro) html += '<p class="step-intro">'+sc.intro+'</p>';
+  html += sc.body();
+
+  var isFirst = (i===0 && state.sub===0);
+  var isLastOfStep = state.sub === list.length-1;
+  var nextLabel = isLastOfStep ? (sc.nextLabel || "Continuer →") : "Suivant →";
+  html += '<div class="navrow">' +
+    (isFirst ? '<span></span>' : '<button class="btn btn-ghost" data-action="prev">← Précédent</button>') +
+    '<button class="btn btn-primary" data-action="next">'+nextLabel+'</button>' +
+  '</div>';
+  return html;
+}
+
+/* Boutons Précédent / Continuer des étapes en un seul bloc (Patrimoine). */
 function navButtons(opts){
   opts = opts || {};
-  var back = state.step>0 ? '<button class="btn btn-ghost" data-action="prev">← Précédent</button>' : '<span></span>';
+  var back = '<button class="btn btn-ghost" data-action="prev">← Précédent</button>';
   var next = opts.nextLabel || "Continuer →";
   var nextBtn = state.step < STEPS.length-1 ? '<button class="btn btn-primary" data-action="next">'+next+'</button>' : '';
   return '<div class="navrow">'+back+nextBtn+'</div>';
 }
 
-/* ---------- STEP 1 : IDENTITE ---------- */
-function stepIdentite(){
-  var p = state.personType;
-  var html = '<div class="eyebrow">Étape 1 / 7</div><h2 class="step-title">Qui êtes-vous&nbsp;?</h2>' +
-    '<p class="step-intro">Ces informations servent à établir votre dossier et à vous identifier auprès de vos interlocuteurs chez IVO Capital Partners.</p>' +
-    '<div class="field"><div class="chips">' +
-      '<button class="chip'+(p==="physique"?" on":"")+'" data-action="set" data-path="personType" data-value="physique">Personne physique</button>' +
-      '<button class="chip'+(p==="morale"?" on":"")+'" data-action="set" data-path="personType" data-value="morale">Personne morale (société)</button>' +
-    '</div></div>';
+var autoTimer = null;
+function cancelAuto(){ if(autoTimer){ clearTimeout(autoTimer); autoTimer = null; } }
 
-  if(p==="physique"){
-    html += fieldRow([
-      textField("nom","Nom","",true),
-      textField("prenom","Prénom","",true)
-    ]) +
-    fieldRow([
-      dateField("dateNaissance","Date de naissance"),
-      textField("profession","Profession (ou ancienne profession si retraité)")
-    ]) +
-    textareaField("adresse","Adresse postale") +
-    fieldRow([
-      selectField("situationFamille","Situation de famille",["","Célibataire","Pacsé(e)","Marié(e)","Divorcé(e)","Veuf / veuve"]),
-      state.situationFamille==="Marié(e)" ? selectField("regimeMatrimonial","Régime matrimonial",["","Communauté légale","Communauté universelle","Séparation de biens","Participation aux acquêts"]) : numField("nbEnfants","Enfants / personnes à charge")
-    ]) +
-    (state.situationFamille==="Marié(e)" ? fieldRow([numField("nbEnfants","Enfants / personnes à charge")]) : "") +
-    checkline("renseignerConjoint","Je souhaite renseigner les informations de mon conjoint") +
-    (state.renseignerConjoint ? fieldRow([
-        textField("conjoint.nom","Nom du conjoint"),
-        textField("conjoint.prenom","Prénom du conjoint")
-      ]) + fieldRow([dateField("conjoint.dateNaissance","Date de naissance du conjoint")]) : "");
+/* where = "first" (arrivée par Suivant / clic sur une étape) ou "last"
+   (arrivée par Précédent). */
+function gotoStep(newStep, where){
+  cancelAuto();
+  visited[state.step] = true;
+  state.step = Math.max(0, Math.min(STEPS.length-1, newStep));
+  visited[state.step] = true;
+  state.sub = where==="last" ? Math.max(0, currentScreens().length-1) : 0;
+  save(); render(true);
+}
+function goNext(){
+  cancelAuto();
+  var list = currentScreens();
+  currentScreen(); // rattrape state.sub si besoin
+  if(state.sub < list.length-1){ state.sub++; save(); render(true); }
+  else if(state.step < STEPS.length-1){ gotoStep(state.step+1, "first"); }
+}
+function goPrev(){
+  cancelAuto();
+  currentScreen();
+  if(state.sub > 0){ state.sub--; save(); render(true); }
+  else if(state.step > 0){ gotoStep(state.step-1, "last"); }
+}
+
+/* Appelé après chaque réponse à choix : si l'écran en cours est "auto" (et que
+   sa condition éventuelle est remplie), on passe à la suite après un court
+   délai. sc.auto = true, ou une fonction qui renvoie true/false. */
+function maybeAutoAdvance(){
+  cancelAuto();
+  if(!AUTO_ADVANCE || state.step < 0) return;
+  var key = STEPS[state.step].key;
+  if(key==="patrimoine" || key==="recap") return;
+  var sc = currentScreen();
+  var ok = typeof sc.auto==="function" ? sc.auto() : !!sc.auto;
+  if(!ok) return;
+  var stepAt = state.step, subAt = state.sub;
+  autoTimer = setTimeout(function(){
+    autoTimer = null;
+    if(state.step===stepAt && state.sub===subAt) goNext();
+  }, AUTO_DELAY_MS);
+}
+
+/* Question à choix : libellé + boutons (chips). */
+function choiceField(path, label, options){
+  var cur = getPath(state, path);
+  return '<div class="field">'+(label ? '<label class="flabel">'+label+'</label>' : '')+'<div class="chips">' +
+    options.map(function(o){ return chip(path, o[0], cur, o[1]); }).join('') +
+  '</div></div>';
+}
+
+/* ==========================================================================
+   ÉTAPE 1 / IDENTITÉ / ÉTAT CIVIL / SOCIÉTÉ / COORDONNÉES
+   Liste des écrans de l'étape (un par question) — voir le moteur "UNE
+   QUESTION PAR ÉCRAN" juste au-dessus. Deux parcours : personne physique ou
+   personne morale (state.personType).
+   ⚠ LIÉ À lib/pdf-fill.js : chaque data-bind (nom, prenom, morale.*,
+   contact.*...) est le nom du champ lu pour remplir le PDF.
+   ========================================================================== */
+function screensIdentite(){
+  var S = [];
+  var isPM = state.personType==="morale";
+
+  S.push({id:"type", title:"Qui êtes-vous&nbsp;?",
+    intro:"Ces informations servent à établir votre dossier et à vous identifier auprès de vos interlocuteurs chez IVO Capital Partners.",
+    auto:true,
+    body:function(){
+      return choiceField("personType", "Vous répondez en tant que :", [["physique","Personne physique"],["morale","Personne morale (société)"]]);
+    }});
+
+  if(!isPM){
+    S.push({id:"nom", title:"Comment vous appelez-vous&nbsp;?", body:function(){
+      return fieldRow([ textField("nom","Nom","",true), textField("prenom","Prénom","",true) ]);
+    }});
+    S.push({id:"naissance", title:"Quelle est votre date de naissance&nbsp;?", body:function(){
+      return fieldRow([ dateField("dateNaissance","Date de naissance") ]);
+    }});
+    S.push({id:"adresse", title:"Quelle est votre adresse&nbsp;?", body:function(){
+      return textareaField("adresse","Adresse postale");
+    }});
+    S.push({id:"profession", title:"Quelle est votre profession&nbsp;?", intro:"Ou votre ancienne profession si vous êtes retraité(e).", body:function(){
+      return fieldRow([ textField("profession","Profession") ]);
+    }});
+    S.push({id:"famille", title:"Quelle est votre situation de famille&nbsp;?", body:function(){
+      var h = choiceField("situationFamille", "", [["Célibataire","Célibataire"],["Pacsé(e)","Pacsé(e)"],["Marié(e)","Marié(e)"],["Divorcé(e)","Divorcé(e)"],["Veuf / veuve","Veuf / veuve"]]);
+      if(state.situationFamille==="Marié(e)"){
+        h += choiceField("regimeMatrimonial", 'Régime matrimonial <span class="opt">(optionnel)</span>', [["Communauté légale","Communauté légale"],["Communauté universelle","Communauté universelle"],["Séparation de biens","Séparation de biens"],["Participation aux acquêts","Participation aux acquêts"]]);
+      }
+      h += fieldRow([ numField("nbEnfants","Enfants / personnes à charge") ]);
+      return h;
+    }});
+    S.push({id:"conjoint", title:"Votre conjoint",
+      auto:function(){ return state.renseignerConjoint===false; },
+      body:function(){
+        var h = yesNoField("renseignerConjoint","Souhaitez-vous renseigner les informations de votre conjoint ?");
+        if(state.renseignerConjoint){
+          h += fieldRow([ textField("conjoint.nom","Nom du conjoint"), textField("conjoint.prenom","Prénom du conjoint") ]) +
+               fieldRow([ dateField("conjoint.dateNaissance","Date de naissance du conjoint") ]);
+        }
+        return h;
+      }});
   } else {
-    html += fieldRow([
-      textField("morale.denomination","Dénomination de la société","",true),
-      textField("morale.formeJuridique","Forme juridique (SAS, SCI…)")
-    ]) +
-    textareaField("morale.adresse","Adresse du siège social") +
-    fieldRow([
-      textField("morale.pays","Pays"),
-      textField("morale.rcs","N° d'identification (RCS)")
-    ]) +
-    fieldRow([
-      textField("morale.activite","Activité de la société"),
-      selectField("morale.regimeFiscal","Régime fiscal",["IS","IR"])
-    ]) +
-    '<div class="field"><label class="flabel">Personne habilitée à répondre au questionnaire</label></div>' +
-    fieldRow([
-      textField("morale.repNom","Nom"),
-      textField("morale.repPrenom","Prénom")
-    ]) +
-    fieldRow([
-      textField("morale.repFonction","Fonction"),
-      textField("morale.repTel","Téléphone")
-    ]);
+    S.push({id:"societe", title:"Quelle est votre société&nbsp;?", body:function(){
+      return fieldRow([ textField("morale.denomination","Dénomination de la société","",true), textField("morale.formeJuridique","Forme juridique (SAS, SCI…)") ]);
+    }});
+    S.push({id:"siege", title:"Où se situe son siège social&nbsp;?", body:function(){
+      return textareaField("morale.adresse","Adresse du siège social") + fieldRow([ textField("morale.pays","Pays") ]);
+    }});
+    S.push({id:"activite", title:"Quelques précisions sur la société", body:function(){
+      return fieldRow([ textField("morale.rcs","N° d'identification (RCS)"), textField("morale.activite","Activité de la société") ]) +
+        choiceField("morale.regimeFiscal", "Régime fiscal", [["IS","Impôt sur les sociétés (IS)"],["IR","Impôt sur le revenu (IR)"]]);
+    }});
+    S.push({id:"representant", title:"Qui répond à ce questionnaire&nbsp;?", intro:"La personne habilitée à répondre au nom de la société.", body:function(){
+      return fieldRow([ textField("morale.repNom","Nom"), textField("morale.repPrenom","Prénom") ]) +
+             fieldRow([ textField("morale.repFonction","Fonction"), textField("morale.repTel","Téléphone") ]);
+    }});
   }
 
-  html += '<div class="field"><label class="flabel">Vos coordonnées <span class="opt">(pour que votre conseiller puisse vous recontacter)</span></label></div>' +
-    fieldRow([
-      emailField("contact.email","Email",true),
-      telField("contact.telephone","Téléphone")
-    ]);
-
-  html += navButtons();
-  return html;
+  S.push({id:"contact", title:"Comment vous recontacter&nbsp;?", intro:"Pour que votre conseiller puisse revenir vers vous.", body:function(){
+    return fieldRow([ emailField("contact.email","Email",true), telField("contact.telephone","Téléphone") ]);
+  }});
+  return S;
 }
 
-/* ---------- STEP 2 : VIGILANCE (LCB-FT) ---------- */
-function stepVigilance(){
-  var html = '<div class="eyebrow">Étape 2 / 7</div><h2 class="step-title">Vérifications réglementaires</h2>' +
-    '<p class="step-intro">Cette étape est imposée par la réglementation française de lutte contre le blanchiment (LCB-FT). Elle est identique pour l\'ensemble de nos clients — ce n\'est en rien une suspicion à votre égard.</p>';
+/* ==========================================================================
+   ÉTAPE 2 / VIGILANCE / LCB-FT / PPE / ORIGINE DES FONDS
+   Écrans conditionnels : "conjoint" seulement si marié(e)/pacsé(e),
+   "bénéficiaires" et "contrôle" seulement pour une société.
+   ⚠ LIÉ À isStepComplete() (plus haut) : la pastille verte de l'étape dépend
+   de ppe.vous, ppe.famille, ppe.conjointPPE et fonds.montant.
+   ========================================================================== */
+function screensVigilance(){
+  var S = [];
+  var isPM = state.personType==="morale";
+  var couple = !isPM && (state.situationFamille==="Marié(e)" || state.situationFamille==="Pacsé(e)");
+  var blurb = "Cette étape est imposée par la réglementation française de lutte contre le blanchiment (LCB-FT). Elle est identique pour l'ensemble de nos clients — ce n'est en rien une suspicion à votre égard.";
 
-  html += yesNoField("ppe.vous","Exercez-vous, ou avez-vous exercé depuis moins d'un an, une fonction politique, juridictionnelle ou administrative importante ?",
-    "On parle ici de \"Personne Politiquement Exposée\" (ministre, élu, magistrat, haut fonctionnaire...).");
-  if(state.ppe.vous===true){
-    html += fieldRow([textField("ppe.vousFonction","Quelle fonction ?"), textField("ppe.vousPays","Dans quel pays ?")]);
+  S.push({id:"ppeVous", title:"Fonctions publiques", intro:blurb,
+    auto:function(){ return state.ppe.vous===false; },
+    body:function(){
+      var h = yesNoField("ppe.vous","Exercez-vous, ou avez-vous exercé depuis moins d'un an, une fonction politique, juridictionnelle ou administrative importante ?",
+        "On parle ici de \"Personne Politiquement Exposée\" (ministre, élu, magistrat, haut fonctionnaire...).");
+      if(state.ppe.vous===true) h += fieldRow([ textField("ppe.vousFonction","Quelle fonction ?"), textField("ppe.vousPays","Dans quel pays ?") ]);
+      return h;
+    }});
+
+  if(couple){
+    S.push({id:"ppeConjoint", title:"Fonctions publiques — votre conjoint",
+      auto:function(){ return state.ppe.conjointPPE===false; },
+      body:function(){
+        var h = yesNoField("ppe.conjointPPE","Votre conjoint est-il, ou a-t-il été, dans cette situation ?");
+        if(state.ppe.conjointPPE===true) h += fieldRow([ textField("ppe.conjointFonction","Quelle fonction ?"), textField("ppe.conjointPays","Dans quel pays ?") ]);
+        return h;
+      }});
   }
 
-  if(state.personType==="physique" && (state.situationFamille==="Marié(e)" || state.situationFamille==="Pacsé(e)")){
-    html += yesNoField("ppe.conjointPPE","Votre conjoint est-il, ou a-t-il été, dans cette situation ?");
-    if(state.ppe.conjointPPE===true){
-      html += fieldRow([textField("ppe.conjointFonction","Quelle fonction ?"), textField("ppe.conjointPays","Dans quel pays ?")]);
-    }
+  S.push({id:"ppeFamille", title:"Fonctions publiques — votre entourage",
+    auto:function(){ return state.ppe.famille===false; },
+    body:function(){
+      var h = yesNoField("ppe.famille","Une personne de votre famille ou de votre entourage proche exerce-t-elle, ou a-t-elle exercé au cours des 12 derniers mois, une telle fonction ?");
+      if(state.ppe.famille===true) h += fieldRow([ textField("ppe.familleFonction","Quelle fonction ?"), textField("ppe.famillePays","Dans quel pays ?") ]);
+      return h;
+    }});
+
+  if(isPM){
+    S.push({id:"beneficiaires", title:"Bénéficiaires effectifs", body:function(){
+      return textareaField("beneficiaires","Personnes physiques détenant directement ou indirectement plus de 25% du capital ou des droits de vote (nom et %)");
+    }});
+    S.push({id:"controle", title:"Contrôle de la société", body:function(){
+      return textareaField("controle","Personnes exerçant un pouvoir de contrôle sur la direction de la société");
+    }});
   }
 
-  html += yesNoField("ppe.famille","Une personne de votre famille ou de votre entourage proche exerce-t-elle, ou a-t-elle exercé au cours des 12 derniers mois, une telle fonction ?");
-  if(state.ppe.famille===true){
-    html += fieldRow([textField("ppe.familleFonction","Quelle fonction ?"), textField("ppe.famillePays","Dans quel pays ?")]);
-  }
+  S.push({id:"montant", title:"Quel montant envisagez-vous d'investir&nbsp;?", body:function(){
+    return fieldRow([ numFieldSuffix("fonds.montant","Montant envisagé","€") ]);
+  }});
 
-  if(state.personType==="morale"){
-    html += textareaField("beneficiaires","Personnes physiques détenant directement ou indirectement plus de 25% du capital ou des droits de vote (nom et %)") +
-      textareaField("controle","Personnes exerçant un pouvoir de contrôle sur la direction de la société");
-  }
+  S.push({id:"origine", title:"D'où proviennent ces fonds&nbsp;?",
+    auto:function(){ return state.fonds.origine==="france"; },
+    body:function(){
+      var h = choiceField("fonds.origine", "Origine géographique des fonds", [["france","France métropolitaine"],["etranger","Hors France métropolitaine"]]);
+      if(state.fonds.origine==="etranger") h += fieldRow([ textField("fonds.origineDetail","Précisez le pays / l'établissement") ]);
+      return h;
+    }});
 
-  html += '<div class="field" style="margin-top:26px"><label class="flabel">Montant des capitaux envisagés</label></div>' +
-    fieldRow([
-      numFieldSuffix("fonds.montant","Montant envisagé","€"),
-      selectField("fonds.origine","Origine géographique des fonds",["france","etranger"], {france:"France métropolitaine", etranger:"Hors France métropolitaine"})
-    ]) +
-    (state.fonds.origine==="etranger" ? fieldRow([textField("fonds.origineDetail","Précisez le pays / l'établissement")]) : "");
-
-  html += '<div class="field"><label class="flabel">Nature de l\'origine des fonds <span class="opt">(plusieurs choix possibles)</span></label>' +
-    '<div class="chips">' +
-    multiChip("fonds.natures","transfert","Transfert d'épargne") +
-    multiChip("fonds.natures","vm","Vente de valeurs mobilières") +
-    multiChip("fonds.natures","immo","Vente d'un bien immobilier") +
-    multiChip("fonds.natures","epargne","Épargne") +
-    multiChip("fonds.natures","heritage","Héritage / succession") +
-    multiChip("fonds.natures","salaires","Salaires") +
-    multiChip("fonds.natures","autre","Autre") +
-    '</div></div>' +
-    (state.fonds.natures.indexOf("autre")>-1 ? fieldRow([textField("fonds.autreNature","Précisez")]) : "");
-
-  html += navButtons();
-  return html;
+  S.push({id:"natures", title:"Quelle est la nature de ces fonds&nbsp;?", intro:"Plusieurs choix possibles.", body:function(){
+    return '<div class="field"><div class="chips">' +
+      multiChip("fonds.natures","transfert","Transfert d'épargne") +
+      multiChip("fonds.natures","vm","Vente de valeurs mobilières") +
+      multiChip("fonds.natures","immo","Vente d'un bien immobilier") +
+      multiChip("fonds.natures","epargne","Épargne") +
+      multiChip("fonds.natures","heritage","Héritage / succession") +
+      multiChip("fonds.natures","salaires","Salaires") +
+      multiChip("fonds.natures","autre","Autre") +
+      '</div></div>' +
+      (state.fonds.natures.indexOf("autre")>-1 ? fieldRow([ textField("fonds.autreNature","Précisez") ]) : "");
+  }});
+  return S;
 }
 
-/* ---------- STEP 3 : PATRIMOINE ---------- */
+/* ==========================================================================
+   ÉTAPE 3 / PATRIMOINE / ACTIFS / REVENUS / CHARGES / FISCALITÉ
+   ⚠ SEULE étape de saisie volontairement gardée d'UN SEUL BLOC (tableau de
+   montants) : elle n'a pas d'écrans, renderStep() appelle directement
+   stepPatrimoine(). ⚠ LIÉ À lib/pdf-fill.js (champs pp.* et pm.*).
+   ========================================================================== */
 function stepPatrimoine(){
   var isPM = state.personType==="morale";
   var html = '<div class="eyebrow">Étape 3 / 7</div><h2 class="step-title">Votre situation patrimoniale</h2>' +
@@ -529,11 +739,11 @@ function patrimoineTotal(){
 }
 
 /* ---------- STEP 4 : CONNAISSANCE ----------
-   Parcours EN INTERNE à l'étape 4 (la progression du haut reste "Étape 4 / 7") :
-   - state.instrIdx 0..8 : UN INSTRUMENT PAR ÉCRAN — son titre, la question de
-     connaissance (réponse directe, plus de "je connais / je ne connais pas") et,
-     juste dessous, la question sur le nombre d'opérations des 12 derniers mois ;
-   - state.instrIdx 9 : les questions oui/non finales (gère seul, mandat...).
+   Écrans de l'étape (voir le moteur "UNE QUESTION PAR ÉCRAN" plus haut) :
+   - UN INSTRUMENT PAR ÉCRAN — son titre, la question de connaissance (réponse
+     directe, plus de "je connais / je ne connais pas") et, juste dessous, la
+     question sur le nombre d'opérations des 12 derniers mois ;
+   - puis une question oui/non par écran (gère seul, mandat, gains, pertes...).
    ⚠ LIÉ À lib/pdf-fill.js : le PDF ne lit que state.instruments[k].connait
    (true/false) et .ops ("aucune"/"1"/"5") — ces deux valeurs doivent rester
    renseignées ici, quel que soit l'écran. connait = la réponse choisie est la
@@ -548,27 +758,14 @@ function ensureQuiz(k){
   }
 }
 
-function stepConnaissance(){
-  var N = INSTRUMENTS.length;
-  var i = Math.max(0, Math.min(N, state.instrIdx||0));
-  return i < N ? renderInstrumentScreen(i) : renderLastQuestionsScreen();
-}
-
-function renderInstrumentScreen(i){
-  var N = INSTRUMENTS.length;
-  var ins = INSTRUMENTS[i];
+function instrumentBody(ins){
   var v = state.instruments[ins.k];
   ensureQuiz(ins.k);
   var entry = QUIZ_BANK[ins.k][v.quizIdx];
   var picked = v.quizSelected;
   if(picked===null && v.connait===false) picked = -1; // ancien brouillon "je ne connais pas"
 
-  var html = '<div class="eyebrow">Étape 4 / 7 · Vos connaissances</div>' +
-    '<div class="iprog"><span>Instrument '+(i+1)+' sur '+N+'</span><div class="iprog-bar"><i style="width:'+Math.round(((i+1)/N)*100)+'%"></i></div></div>' +
-    '<h2 class="step-title">'+ins.n+'</h2>' +
-    '<p class="step-intro">'+ins.d+'</p>';
-
-  html += '<div class="field"><label class="flabel">'+entry.q+'</label><div class="qa-opts">';
+  var html = '<div class="field"><label class="flabel">'+entry.q+'</label><div class="qa-opts">';
   v.quizOrder.forEach(function(optIdx){
     html += '<button class="qa-opt'+(picked===optIdx?" on":"")+'" data-action="quizAnswer" data-key="'+ins.k+'" data-value="'+optIdx+'">'+entry.opts[optIdx]+'</button>';
   });
@@ -580,136 +777,156 @@ function renderInstrumentScreen(i){
     chip("instruments."+ins.k+".ops","1",v.ops,"1 à 4") +
     chip("instruments."+ins.k+".ops","5",v.ops,"5 ou plus") +
   '</div></div>';
-
-  html += '<div class="navrow">' +
-    '<button class="btn btn-ghost" data-action="instrPrev">← Précédent</button>' +
-    '<button class="btn btn-primary" data-action="instrNext">Suivant →</button>' +
-  '</div>';
   return html;
 }
 
-function renderLastQuestionsScreen(){
-  var html = '<div class="eyebrow">Étape 4 / 7 · Votre expérience</div><h2 class="step-title">Votre expérience des marchés</h2>' +
-    '<p class="step-intro">Encore quelques questions rapides.</p>';
-  html += yesNoField("gereSeul","Gérez-vous vous-même votre portefeuille ?");
-  if(state.gereSeul===true){ html += fieldRow([textField("gereSeulDepuis","Depuis combien de temps ?")]); }
-  html += yesNoField("mandatGestion","Avez-vous (ou avez-vous déjà eu) un portefeuille géré sous mandat ?");
-  html += yesNoField("experiencePro","Avez-vous exercé, pendant au moins un an, une activité professionnelle exigeant une connaissance des instruments financiers ?");
-  html += yesNoField("gains","Avez-vous déjà réalisé des gains sur des produits financiers ?");
-  html += yesNoField("pertes","Avez-vous déjà subi des pertes sur des produits financiers ?");
-  html += yesNoField("conscienceRisque","Avez-vous conscience des pertes en capital possibles liées aux investissements sur les marchés financiers ?");
-  html += '<div class="navrow">' +
-    '<button class="btn btn-ghost" data-action="instrPrev">← Précédent</button>' +
-    '<button class="btn btn-primary" data-action="next">Continuer →</button>' +
-  '</div>';
-  return html;
-}
-
-/* ---------- STEP 5 : OBJECTIFS ---------- */
-function stepObjectifs(){
-  var isPM = state.personType==="morale";
-  var labels = isPM ? OBJ_LABELS_MORALE : OBJ_LABELS_PHYSIQUE;
-  var order = isPM ? state.objOrderMorale : state.objOrder;
-  var orderKey = isPM ? "objOrderMorale" : "objOrder";
-
-  var html = '<div class="eyebrow">Étape 5 / 7</div><h2 class="step-title">Vos objectifs et votre horizon</h2>' +
-    '<p class="step-intro">Classez ces objectifs du plus important (en haut) au moins important pour vous — glissez-les avec <span class="rankhandle-inline">⠿</span>, ou utilisez les flèches.</p>' +
-    '<div class="ranklist">';
-
-  order.forEach(function(key, idx){
-    html += '<div class="rankitem">' +
-      '<div class="rankhandle" data-orderkey="'+orderKey+'" data-idx="'+idx+'">⠿</div>' +
-      '<div class="ranknum">'+(idx+1)+'</div><div class="ranktext">'+labels[key]+'</div>' +
-      '<div class="rankbtns">' +
-      '<button data-action="rankup" data-orderkey="'+orderKey+'" data-idx="'+idx+'" '+(idx===0?"disabled":"")+'>↑</button>' +
-      '<button data-action="rankdown" data-orderkey="'+orderKey+'" data-idx="'+idx+'" '+(idx===order.length-1?"disabled":"")+'>↓</button>' +
-      '</div></div>';
+function screensConnaissance(){
+  var S = [];
+  INSTRUMENTS.forEach(function(ins){
+    // pas de passage automatique ici : deux questions sur le même écran
+    S.push({id:"instr-"+ins.k, title:ins.n, intro:ins.d, body:function(){ return instrumentBody(ins); }});
   });
-  html += '</div>';
-  html += '</div>';
-
-  html += '<div class="field" style="margin-top:24px"><label class="flabel">Votre horizon d\'investissement</label>';
-  var horizons = [
-    {k:"court", t:"Court terme", d:"Moins de 2 ans"},
-    {k:"moyen", t:"Moyen terme", d:"De 2 à 5 ans"},
-    {k:"long", t:"Long terme", d:"De 5 à 8 ans"},
-    {k:"tlong", t:"Très long terme", d:"Plus de 8 ans"}
-  ];
-  horizons.forEach(function(h){
-    html += optCard("horizon", h.k, state.horizon, h.t, h.d);
+  var T = "Votre expérience des marchés";
+  S.push({id:"gereSeul", title:T, auto:function(){ return state.gereSeul===false; }, body:function(){
+    var h = yesNoField("gereSeul","Gérez-vous vous-même votre portefeuille ?");
+    if(state.gereSeul===true) h += fieldRow([ textField("gereSeulDepuis","Depuis combien de temps ?") ]);
+    return h;
+  }});
+  [
+    ["mandatGestion","Avez-vous (ou avez-vous déjà eu) un portefeuille géré sous mandat ?"],
+    ["experiencePro","Avez-vous exercé, pendant au moins un an, une activité professionnelle exigeant une connaissance des instruments financiers ?"],
+    ["gains","Avez-vous déjà réalisé des gains sur des produits financiers ?"],
+    ["pertes","Avez-vous déjà subi des pertes sur des produits financiers ?"],
+    ["conscienceRisque","Avez-vous conscience des pertes en capital possibles liées aux investissements sur les marchés financiers ?"]
+  ].forEach(function(q){
+    S.push({id:q[0], title:T, auto:true, body:function(){ return yesNoField(q[0], q[1]); }});
   });
-  html += '</div>';
-
-  html += textareaField("projetsCourtTerme","Avez-vous des projets à court terme ou des besoins en revenus réguliers à nous signaler ? (optionnel)");
-
-  html += navButtons();
-  return html;
+  return S;
 }
 
-/* ---------- STEP 6 : DURABILITE (ESG) ---------- */
-function stepDurabilite(){
-  var html = '<div class="eyebrow">Étape 6 / 7</div><h2 class="step-title">Vos préférences en matière de durabilité</h2>' +
-    '<p class="step-intro">Depuis 2022, la réglementation nous impose de recueillir vos préférences en matière de durabilité (critères Environnementaux, Sociaux et de Gouvernance — ESG).</p>';
+/* ==========================================================================
+   ÉTAPE 5 / OBJECTIFS / CLASSEMENT PAR GLISSER-DÉPOSER / HORIZON
+   ⚠ LIÉ À setupDragHandle() (plus bas) pour le glisser des objectifs, et à
+   lib/ivo-theme.css (classes .ranklist / .rankitem / .rankhandle).
+   ========================================================================== */
+function screensObjectifs(){
+  var S = [];
+  S.push({id:"classement", title:"Vos objectifs",
+    intro:'Classez ces objectifs du plus important (en haut) au moins important pour vous — glissez-les avec <span class="rankhandle-inline">⠿</span>, ou utilisez les flèches.',
+    body:function(){
+      var isPM = state.personType==="morale";
+      var labels = isPM ? OBJ_LABELS_MORALE : OBJ_LABELS_PHYSIQUE;
+      var order = isPM ? state.objOrderMorale : state.objOrder;
+      var orderKey = isPM ? "objOrderMorale" : "objOrder";
+      var html = '<div class="ranklist">';
+      order.forEach(function(key, idx){
+        html += '<div class="rankitem">' +
+          '<div class="rankhandle" data-orderkey="'+orderKey+'" data-idx="'+idx+'">⠿</div>' +
+          '<div class="ranknum">'+(idx+1)+'</div><div class="ranktext">'+labels[key]+'</div>' +
+          '<div class="rankbtns">' +
+          '<button data-action="rankup" data-orderkey="'+orderKey+'" data-idx="'+idx+'" '+(idx===0?"disabled":"")+'>↑</button>' +
+          '<button data-action="rankdown" data-orderkey="'+orderKey+'" data-idx="'+idx+'" '+(idx===order.length-1?"disabled":"")+'>↓</button>' +
+          '</div></div>';
+      });
+      html += '</div>';
+      return html;
+    }});
 
-  html += '<div class="field"><label class="flabel">Souhaitez-vous inclure une dimension ESG dans votre projet d\'investissement ?</label>' +
-    optCard("esg.inclure","oui",state.esg.inclure,"Oui","J'attache de l'importance à ces critères") +
-    optCard("esg.inclure","non",state.esg.inclure,"Non","Ce n'est pas un critère pour moi") +
-    optCard("esg.inclure","nonExprime",state.esg.inclure,"Je ne me suis pas encore exprimé(e)","Nous pourrons en reparler ensemble") +
-  '</div>';
+  S.push({id:"horizon", title:"Quel est votre horizon d'investissement&nbsp;?", auto:true, body:function(){
+    var horizons = [
+      {k:"court", t:"Court terme", d:"Moins de 2 ans"},
+      {k:"moyen", t:"Moyen terme", d:"De 2 à 5 ans"},
+      {k:"long", t:"Long terme", d:"De 5 à 8 ans"},
+      {k:"tlong", t:"Très long terme", d:"Plus de 8 ans"}
+    ];
+    return '<div class="field">' + horizons.map(function(h){ return optCard("horizon", h.k, state.horizon, h.t, h.d); }).join('') + '</div>';
+  }});
+
+  S.push({id:"projets", title:"Des projets à nous signaler&nbsp;?", body:function(){
+    return textareaField("projetsCourtTerme",'Avez-vous des projets à court terme ou des besoins en revenus réguliers ? <span class="opt">(optionnel)</span>');
+  }});
+  return S;
+}
+
+/* ==========================================================================
+   ÉTAPE 6 / DURABILITÉ / ESG / SFDR / INVESTISSEMENTS À IMPACT
+   L'écran "thématique" n'apparaît que si la réponse ESG est "oui".
+   ========================================================================== */
+function screensDurabilite(){
+  var S = [];
+  S.push({id:"inclure", title:"Vos préférences en matière de durabilité",
+    intro:"Depuis 2022, la réglementation nous impose de recueillir vos préférences en matière de durabilité (critères Environnementaux, Sociaux et de Gouvernance — ESG).",
+    auto:true,
+    body:function(){
+      return '<div class="field"><label class="flabel">Souhaitez-vous inclure une dimension ESG dans votre projet d\'investissement ?</label>' +
+        optCard("esg.inclure","oui",state.esg.inclure,"Oui","J'attache de l'importance à ces critères") +
+        optCard("esg.inclure","non",state.esg.inclure,"Non","Ce n'est pas un critère pour moi") +
+        optCard("esg.inclure","nonExprime",state.esg.inclure,"Je ne me suis pas encore exprimé(e)","Nous pourrons en reparler ensemble") +
+      '</div>';
+    }});
 
   if(state.esg.inclure==="oui"){
-    html += '<div class="field"><label class="flabel">Souhaitez-vous privilégier une thématique en particulier ? <span class="opt">(optionnel)</span></label><div class="chips">' +
-      chip("esg.thematique","environnementale",state.esg.thematique,"Environnementale") +
-      chip("esg.thematique","sociale",state.esg.thematique,"Sociale") +
-      chip("esg.thematique","gouvernance",state.esg.thematique,"Bonne gouvernance") +
-    '</div></div>';
+    S.push({id:"thematique", title:"Une thématique à privilégier&nbsp;?", intro:"Optionnel — vous pouvez passer cette question.", auto:true, body:function(){
+      return choiceField("esg.thematique", "", [["environnementale","Environnementale"],["sociale","Sociale"],["gouvernance","Bonne gouvernance"]]);
+    }});
   }
 
-  html += '<div class="field"><label class="flabel">Concernant les fonds sur lesquels vous seriez investi(e), quelle serait votre position sur la répartition par article SFDR ?</label>' +
-    optCard("esg.sfdr","convient",state.esg.sfdr,"Cela me convient","Je n'ai pas de demande particulière sur ce point") +
-    optCard("esg.sfdr","pasImportant",state.esg.sfdr,"Je n'y attache pas d'importance","") +
-    optCard("esg.sfdr","revoir",state.esg.sfdr,"Je souhaite en revoir la répartition","À discuter avec mon conseiller") +
-  '</div>';
+  S.push({id:"sfdr", title:"Répartition par article SFDR", auto:true, body:function(){
+    return '<div class="field"><label class="flabel">Concernant les fonds sur lesquels vous seriez investi(e), quelle serait votre position sur la répartition par article SFDR ?</label>' +
+      optCard("esg.sfdr","convient",state.esg.sfdr,"Cela me convient","Je n'ai pas de demande particulière sur ce point") +
+      optCard("esg.sfdr","pasImportant",state.esg.sfdr,"Je n'y attache pas d'importance","") +
+      optCard("esg.sfdr","revoir",state.esg.sfdr,"Je souhaite en revoir la répartition","À discuter avec mon conseiller") +
+    '</div>';
+  }});
 
-  html += '<div class="field"><label class="flabel">Souhaiteriez-vous que l\'on vous propose davantage d\'investissements à impact et/ou de fonds labellisés ?</label>' +
-    optCard("esg.impact","non",state.esg.impact,"Non, je suis satisfait(e) de la situation actuelle","") +
-    optCard("esg.impact","oui",state.esg.impact,"Oui, j'aimerais qu'on m'en propose davantage","") +
-  '</div>';
-
-  html += navButtons();
-  return html;
+  S.push({id:"impact", title:"Investissements à impact", auto:true, body:function(){
+    return '<div class="field"><label class="flabel">Souhaiteriez-vous que l\'on vous propose davantage d\'investissements à impact et/ou de fonds labellisés ?</label>' +
+      optCard("esg.impact","non",state.esg.impact,"Non, je suis satisfait(e) de la situation actuelle","") +
+      optCard("esg.impact","oui",state.esg.impact,"Oui, j'aimerais qu'on m'en propose davantage","") +
+    '</div>';
+  }});
+  return S;
 }
 
-/* ---------- STEP 7 : PROFIL DE RISQUE ---------- */
-function stepProfil(){
-  var html = '<div class="eyebrow">Étape 7 / 7</div><h2 class="step-title">Votre rapport au risque</h2>' +
-    '<p class="step-intro">Ces trois questions nous aident à cerner votre tolérance au risque. Le profil obtenu est indicatif : votre conseiller le validera avec vous lors de votre échange.</p>';
+/* ==========================================================================
+   ÉTAPE 7 / PROFIL DE RISQUE / TOLÉRANCE AUX PERTES / PROFIL INDICATIF
+   ⚠ LIÉ À computeProfile() juste en dessous (calcul du profil affiché) et à
+   lib/conseiller-app.js suggestProfile() qui refait le MÊME calcul côté
+   conseiller : changer un barème ici sans l'autre donne deux profils différents.
+   ========================================================================== */
+function screensProfil(){
+  var S = [];
+  var blurb = "Ces trois questions nous aident à cerner votre tolérance au risque. Le profil obtenu est indicatif : votre conseiller le validera avec vous lors de votre échange.";
 
-  html += '<div class="field"><label class="flabel">Pour un investissement de 100 000 €, quelle baisse temporaire seriez-vous prêt(e) à accepter ?</label>' +
-    optCard("risque.perte","p1",state.risque.perte,"Jusqu'à 10 000 €", "") +
-    optCard("risque.perte","p2",state.risque.perte,"Jusqu'à 20 000 €", "") +
-    optCard("risque.perte","p3",state.risque.perte,"Jusqu'à 30 000 €", "") +
-    optCard("risque.perte","p4",state.risque.perte,"Plus de 30 000 €", "") +
-  '</div>';
+  S.push({id:"perte", title:"Votre rapport au risque", intro:blurb, auto:true, body:function(){
+    return '<div class="field"><label class="flabel">Pour un investissement de 100 000 €, quelle baisse temporaire seriez-vous prêt(e) à accepter ?</label>' +
+      optCard("risque.perte","p1",state.risque.perte,"Jusqu'à 10 000 €", "") +
+      optCard("risque.perte","p2",state.risque.perte,"Jusqu'à 20 000 €", "") +
+      optCard("risque.perte","p3",state.risque.perte,"Jusqu'à 30 000 €", "") +
+      optCard("risque.perte","p4",state.risque.perte,"Plus de 30 000 €", "") +
+    '</div>';
+  }});
 
-  html += '<div class="field"><label class="flabel">Si la valeur de vos investissements chutait brusquement, quelle serait votre réaction ?</label>' +
-    optCard("risque.reaction","vendre",state.risque.reaction,"Je vends pour limiter mes pertes","") +
-    optCard("risque.reaction","conserver",state.risque.reaction,"Je conserve, dans une optique de long terme","") +
-    optCard("risque.reaction","investir",state.risque.reaction,"J'en profite pour investir davantage","") +
-  '</div>';
+  S.push({id:"reaction", title:"Votre rapport au risque", auto:true, body:function(){
+    return '<div class="field"><label class="flabel">Si la valeur de vos investissements chutait brusquement, quelle serait votre réaction ?</label>' +
+      optCard("risque.reaction","vendre",state.risque.reaction,"Je vends pour limiter mes pertes","") +
+      optCard("risque.reaction","conserver",state.risque.reaction,"Je conserve, dans une optique de long terme","") +
+      optCard("risque.reaction","investir",state.risque.reaction,"J'en profite pour investir davantage","") +
+    '</div>';
+  }});
 
-  html += '<div class="field"><label class="flabel">Quel couple rendement / risque vous correspond le mieux ?</label>' +
-    optCard("risque.rendement","r1",state.risque.rendement,"Viser 3% de performance, en acceptant jusqu'à 6% de perte","") +
-    optCard("risque.rendement","r2",state.risque.rendement,"Viser 5% de performance, en acceptant jusqu'à 10% de perte","") +
-    optCard("risque.rendement","r3",state.risque.rendement,"Viser 15% de performance, en acceptant jusqu'à 30% de perte","") +
-  '</div>';
-
-  if(state.risque.perte && state.risque.reaction && state.risque.rendement){
-    html += profileBlock(computeProfile());
-  }
-
-  html += navButtons({nextLabel:"Voir mon bilan →"});
-  return html;
+  // Dernier écran : pas de passage automatique, pour laisser lire le profil
+  // indicatif qui s'affiche dès que les trois réponses sont données.
+  S.push({id:"rendement", title:"Votre rapport au risque", nextLabel:"Voir mon bilan →", body:function(){
+    var h = '<div class="field"><label class="flabel">Quel couple rendement / risque vous correspond le mieux ?</label>' +
+      optCard("risque.rendement","r1",state.risque.rendement,"Viser 3% de performance, en acceptant jusqu'à 6% de perte","") +
+      optCard("risque.rendement","r2",state.risque.rendement,"Viser 5% de performance, en acceptant jusqu'à 10% de perte","") +
+      optCard("risque.rendement","r3",state.risque.rendement,"Viser 15% de performance, en acceptant jusqu'à 30% de perte","") +
+    '</div>';
+    if(state.risque.perte && state.risque.reaction && state.risque.rendement) h += profileBlock(computeProfile());
+    return h;
+  }});
+  return S;
 }
 
 function computeProfile(){
@@ -728,7 +945,11 @@ function profileBlock(p){
     '<div class="disclaimer">* Hypothèses non contractuelles, données à titre indicatif. Ce profil sera confirmé par votre conseiller IVO Capital Partners.</div></div>';
 }
 
-/* ---------- STEP 8 : RECAP ---------- */
+/* ==========================================================================
+   BILAN / RÉCAPITULATIF / CHOIX DU CONSEILLER / ENVOI
+   Page d'un seul bloc (pas d'écrans). ⚠ LIÉ À lib/submit.js (envoi) et à
+   client/config.js (liste des conseillers).
+   ========================================================================== */
 function stepRecap(){
   var missing = [];
   if(state.personType==="physique" && !state.nom) missing.push("votre nom");
@@ -914,7 +1135,11 @@ function buildSyntheseText(){
   return lines.join("\n");
 }
 
-/* ---------- field helpers ---------- */
+/* ==========================================================================
+   FABRIQUES DE CHAMPS / TEXTE - DATE - NOMBRE - LISTE - OUI/NON - PUCES
+   Chaque fonction renvoie le HTML d'un champ relié à "state" : data-bind
+   (saisie libre) ou data-action + data-path (choix). ⚠ LIÉ À bindEvents().
+   ========================================================================== */
 function fieldRow(fields){ return '<div class="field-row">'+fields.join("")+'</div>'; }
 function subhead(t){ return '<h3 style="font-size:14px;margin:22px 0 12px;color:var(--brand)">'+t+'</h3>'; }
 function textField(path,label,ph,req){
@@ -996,7 +1221,11 @@ function statTile(label, value){
   return '<div class="stattile"><span class="sl">'+label+'</span><span class="sv tabular">'+fmt(value)+' <small>K€</small></span></div>';
 }
 
-/* ---------- events ---------- */
+/* ==========================================================================
+   ÉCOUTEURS D'ÉVÉNEMENTS / CLICS / SAISIE / AIGUILLAGE DES ACTIONS
+   Rappelé après CHAQUE render() : la page vient d'être redessinée, tous les
+   éléments sont neufs (aucun risque de double écouteur).
+   ========================================================================== */
 function bindEvents(){
   var app = document.getElementById("app");
 
@@ -1010,41 +1239,39 @@ function bindEvents(){
         if(tile){ tile.innerHTML = fmt(patrimoineTotal())+' <small>K€</small>'; }
       }
     });
+    // Touche Entrée dans un champ d'une ligne = "Suivant" (sauf sur l'étape
+    // Patrimoine et le Bilan, qui sont de longues pages, et dans les zones de
+    // texte où Entrée sert à aller à la ligne).
+    if(el.tagName==="INPUT"){
+      el.addEventListener("keydown", function(e){
+        if(e.key!=="Enter") return;
+        var k = STEPS[state.step] && STEPS[state.step].key;
+        if(k==="patrimoine" || k==="recap") return;
+        e.preventDefault();
+        goNext();
+      });
+    }
   });
 
   app.querySelectorAll("[data-action]").forEach(function(el){
     el.addEventListener("click", function(e){
       e.preventDefault();
       var action = el.getAttribute("data-action");
-      if(action==="start"){ state.step=0; visited[0]=true; save(); render(true); return; }
+      if(action==="start"){ cancelAuto(); state.step=0; state.sub=0; visited[0]=true; save(); render(true); return; }
       if(action==="reset"){
         if(confirm("Recommencer le questionnaire à zéro ? Vos réponses actuelles seront perdues.")){
-          state = defaultState(); visited={}; save(); render(true);
+          cancelAuto(); state = defaultState(); visited={}; save(); render(true);
         }
         return;
       }
-      if(action==="goto"){
-        visited[state.step]=true;
-        state.step = parseInt(el.getAttribute("data-step"),10);
-        visited[state.step]=true;
-        save(); render(true); return;
-      }
-      if(action==="next"){
-        visited[state.step]=true;
-        state.step = Math.min(STEPS.length-1, state.step+1);
-        visited[state.step]=true;
-        if(STEPS[state.step].key==="connaissance") state.instrIdx = 0;
-        save(); render(true); return;
-      }
-      if(action==="prev"){
-        visited[state.step]=true;
-        state.step = Math.max(0, state.step-1);
-        visited[state.step]=true;
-        if(STEPS[state.step].key==="connaissance") state.instrIdx = INSTRUMENTS.length;
-        save(); render(true); return;
-      }
-      if(action==="set"){ setPath(state, el.getAttribute("data-path"), el.getAttribute("data-value")); save(); render(false); return; }
-      if(action==="setbool"){ setPath(state, el.getAttribute("data-path"), el.getAttribute("data-value")==="true"); save(); render(false); return; }
+      /* --- NAVIGATION (voir le moteur "UNE QUESTION PAR ÉCRAN") --- */
+      if(action==="goto"){ gotoStep(parseInt(el.getAttribute("data-step"),10), "first"); return; }
+      if(action==="next"){ goNext(); return; }
+      if(action==="prev"){ goPrev(); return; }
+      /* --- RÉPONSES À CHOIX : enregistre, réaffiche, puis passe seul à la
+         suite si l'écran est "auto" (maybeAutoAdvance()) --- */
+      if(action==="set"){ setPath(state, el.getAttribute("data-path"), el.getAttribute("data-value")); save(); render(false); maybeAutoAdvance(); return; }
+      if(action==="setbool"){ setPath(state, el.getAttribute("data-path"), el.getAttribute("data-value")==="true"); save(); render(false); maybeAutoAdvance(); return; }
       if(action==="check"){ setPath(state, el.getAttribute("data-path"), el.checked); save(); render(false); return; }
       if(action==="togglearr"){
         var path = el.getAttribute("data-path"), val = el.getAttribute("data-value");
@@ -1073,15 +1300,6 @@ function bindEvents(){
         ik.quizSelected = -1;
         ik.connait = false;
         save(); render(false); return;
-      }
-      if(action==="instrPrev"){
-        if((state.instrIdx||0) > 0){ state.instrIdx = state.instrIdx - 1; }
-        else { state.step = Math.max(0, state.step-1); visited[state.step]=true; }
-        save(); render(true); return;
-      }
-      if(action==="instrNext"){
-        state.instrIdx = Math.min(INSTRUMENTS.length, (state.instrIdx||0) + 1);
-        save(); render(true); return;
       }
       if(action==="copy"){
         var txt = buildSyntheseText();
@@ -1237,7 +1455,24 @@ function submitToAdvisorFlow(btn){
   });
 }
 
-render();
+/* --- DÉMARRAGE / FILET DE SÉCURITÉ ---
+   Si l'affichage échoue malgré tout à cause du brouillon enregistré, on ne
+   laisse pas le client devant une page blanche : le brouillon fautif est mis
+   de côté (clé STORAGE_KEY + "_backup", récupérable depuis la console) et le
+   questionnaire repart de l'accueil. */
+try{
+  render();
+}catch(startErr){
+  console.error("Brouillon illisible, questionnaire réinitialisé :", startErr);
+  try{
+    var rawDraft = localStorage.getItem(STORAGE_KEY);
+    if(rawDraft) localStorage.setItem(STORAGE_KEY + "_backup", rawDraft);
+    localStorage.removeItem(STORAGE_KEY);
+  }catch(e){}
+  state = defaultState();
+  visited = {};
+  render();
+}
 })();
 </script>
 </body>
