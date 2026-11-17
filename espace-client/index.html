@@ -360,6 +360,52 @@ function docBadge(status){
   return '<span class="badge badge-recu">En attente de validation</span>';
 }
 
+/* ==========================================================================
+   BILANS / REPORTINGS RANGÉS PAR MOIS
+   Les bilans déposés par le conseiller sont des fichiers de la base
+   documentaire du client, rangés sous un dossier racine marqué
+   kind='reports' (nommé "Reportings"), puis année, puis mois ("10 - Octobre").
+   Ils s'affichent dans "Mes bilans" et JAMAIS dans "Mes documents".
+   ⚠ LIÉ À lib/conseiller-app.js (bloc "DÉPÔT DES BILANS" : monthFolderName(),
+   reportGroupLabel(), reportFolderIdSet()) et au SQL section 15
+   (client_folders.kind). Les anciens bilans (table client_reports) restent
+   affichés en dessous.
+   ========================================================================== */
+function reportFolderSet(){
+  var kids = {}, set = {};
+  appState.sharedFolders.forEach(function(f){ var p = f.parent_id || "root"; (kids[p] = kids[p] || []).push(f.id); });
+  var stack = appState.sharedFolders.filter(function(f){ return f.kind==="reports"; }).map(function(f){ return f.id; });
+  while(stack.length){
+    var id = stack.pop();
+    if(set[id]) continue;
+    set[id] = true;
+    (kids[id]||[]).forEach(function(k){ stack.push(k); });
+  }
+  return set;
+}
+function isReportFile(f, set){ return !!(f.folder_id && (set || reportFolderSet())[f.folder_id]); }
+
+/* Noms des dossiers sous la racine, ex : ["2026", "10 - Octobre"]. */
+function reportPathParts(folderId){
+  var byId = {};
+  appState.sharedFolders.forEach(function(d){ byId[d.id] = d; });
+  var parts = [], c = folderId, guard = 0;
+  while(c && byId[c] && byId[c].kind!=="reports" && guard++ < 60){ parts.unshift(byId[c].name); c = byId[c].parent_id; }
+  return parts;
+}
+/* "2026" + "10 - Octobre" → "Octobre 2026" (même règle que côté conseiller). */
+function reportGroupLabel(parts){
+  if(parts.length===2 && /^\d{4}$/.test(parts[0])){
+    var mm = parts[1].match(/^\d{1,2}\s*-\s*(.+)$/);
+    if(mm) return mm[1] + " " + parts[0];
+  }
+  return parts.length ? parts.join(" / ") : "Autres bilans";
+}
+function reportFiles(){
+  var set = reportFolderSet();
+  return appState.sharedFiles.filter(function(f){ return isReportFile(f, set); });
+}
+
 function unreadCount(){
   return appState.messages.filter(function(m){ return m.from_advisor && !m.read_at; }).length;
 }
@@ -376,7 +422,9 @@ function renderDashboard(){
   // attente de validation) ; "manquant" = rien transmis, ou refusé.
   var providedCount = items.filter(function(it){ var d = latestDocFor(it); return d && d.status!=="refuse"; }).length;
   var missingCount = items.length - providedCount;
-  var lastReport = appState.reports.length ? appState.reports[0] : null;
+  var lastReportDate = null; // le plus récent : bilans rangés par mois ou anciens bilans
+  reportFiles().forEach(function(f){ if(!lastReportDate || f.uploaded_at > lastReportDate) lastReportDate = f.uploaded_at; });
+  appState.reports.forEach(function(r){ if(!lastReportDate || r.sent_at > lastReportDate) lastReportDate = r.sent_at; });
   var unread = unreadCount();
 
   /* ⚠ Pas de mise à jour en temps réel des documents : le bouton "Actualiser"
@@ -393,7 +441,7 @@ function renderDashboard(){
     html += '<p class="step-intro">Voici un aperçu de votre espace chez IVO Capital Partners.</p>';
     html += '<div class="statgrid">' +
       '<div class="stattile2"><div class="l">Documents fournis</div><div class="v">'+providedCount+' <small style="font-size:12px;color:var(--text-muted)">/ '+items.length+'</small></div></div>' +
-      '<div class="stattile2"><div class="l">Dernier bilan reçu</div><div class="v" style="font-size:15px">'+(lastReport?esc(fmtDateTime(lastReport.sent_at)):'—')+'</div></div>' +
+      '<div class="stattile2"><div class="l">Dernier bilan reçu</div><div class="v" style="font-size:15px">'+(lastReportDate?esc(fmtDateTime(lastReportDate)):'—')+'</div></div>' +
       '<div class="stattile2"><div class="l">Messages non lus</div><div class="v" id="statUnread">'+unread+'</div></div>' +
     '</div>';
     if(missingCount > 0){
@@ -405,22 +453,7 @@ function renderDashboard(){
   } else if(appState.tab==="documents"){
     html += renderDocumentsTab(items);
   } else if(appState.tab==="bilans"){
-    html += '<h1 class="step-title" style="margin-bottom:4px">Mes bilans</h1>';
-    html += '<p class="section-sub">Les comptes rendus et bilans transmis par votre conseiller.</p>';
-    if(!appState.reports.length){
-      html += '<div class="empty-state">Aucun bilan reçu pour le moment.</div>';
-    } else {
-      html += '<div class="sublist">';
-      appState.reports.forEach(function(r){
-        html += '<div class="subitem">' +
-          '<div><div class="subitem-name">'+esc(r.title)+'</div>' +
-          '<div class="subitem-meta">Transmis le '+fmtDateTime(r.sent_at)+'</div></div>' +
-          '<button class="btn btn-ghost" data-action="viewReport" data-id="'+esc(r.id)+'">Voir</button>' +
-          '<button class="btn btn-primary" data-action="downloadReport" data-id="'+esc(r.id)+'">Télécharger</button>' +
-        '</div>';
-      });
-      html += '</div>';
-    }
+    html += renderBilansTab();
   } else if(appState.tab==="messages"){
     html += renderMessagesTab();
   }
@@ -431,6 +464,43 @@ function renderDashboard(){
 /* ==========================================================================
    ONGLET "MES DOCUMENTS" : documents demandés / envoi libre / documents partagés
    ========================================================================== */
+/* Onglet "Mes bilans" : bilans rangés par mois (du plus récent au plus
+   ancien), puis les anciens bilans. */
+function renderBilansTab(){
+  var html = '<h1 class="step-title" style="margin-bottom:4px">Mes bilans</h1>';
+  html += '<p class="section-sub">Les reportings et bilans transmis par votre conseiller, classés par mois.</p>';
+  var files = reportFiles();
+  if(!files.length && !appState.reports.length){
+    return html + '<div class="empty-state">Aucun bilan reçu pour le moment.</div>';
+  }
+  var groups = {};
+  files.forEach(function(f){
+    var parts = reportPathParts(f.folder_id);
+    var key = parts.join("/");
+    (groups[key] = groups[key] || { parts: parts, files: [] }).files.push(f);
+  });
+  Object.keys(groups).sort().reverse().forEach(function(key){
+    var g = groups[key];
+    html += '<div class="block-title" style="margin-top:18px">'+esc(reportGroupLabel(g.parts))+'</div><div class="sublist">';
+    g.files.sort(function(a, b){ return String(a.file_name).localeCompare(String(b.file_name), "fr", {numeric:true}); })
+      .forEach(function(f){ html += fileRow(f, 'Transmis le '+fmtDateTime(f.uploaded_at)); });
+    html += '</div>';
+  });
+  if(appState.reports.length){
+    html += '<div class="block-title" style="margin-top:18px">'+(files.length ? 'Bilans précédents' : 'Vos bilans')+'</div><div class="sublist">';
+    appState.reports.forEach(function(r){
+      html += '<div class="subitem">' +
+        '<div><div class="subitem-name">'+esc(r.title)+'</div>' +
+        '<div class="subitem-meta">Transmis le '+fmtDateTime(r.sent_at)+'</div></div>' +
+        '<button class="btn btn-ghost" data-action="viewReport" data-id="'+esc(r.id)+'">Voir</button>' +
+        '<button class="btn btn-primary" data-action="downloadReport" data-id="'+esc(r.id)+'">Télécharger</button>' +
+      '</div>';
+    });
+    html += '</div>';
+  }
+  return html;
+}
+
 function fileRow(f, sub){
   return '<div class="subitem">' +
     '<div><div class="subitem-name">'+esc((f.file_name||"").split("/").pop())+'</div>' +
@@ -493,8 +563,9 @@ function renderDocumentsTab(items){
      Deux groupes : ceux qu'il a envoyés lui-même (uploaded_by_client) et ceux
      partagés par le conseiller. Un fichier que le conseiller classe "en
      interne" disparaît d'ici (la RLS ne le renvoie plus). */
+  var repSet = reportFolderSet(); // les bilans ont leur propre onglet
   var mine = appState.sharedFiles.filter(function(f){ return f.uploaded_by_client; });
-  var theirs = appState.sharedFiles.filter(function(f){ return !f.uploaded_by_client; });
+  var theirs = appState.sharedFiles.filter(function(f){ return !f.uploaded_by_client && !isReportFile(f, repSet); });
 
   if(mine.length){
     html += '<div class="block-title">Vos envois</div>';
