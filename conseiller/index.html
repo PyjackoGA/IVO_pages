@@ -110,7 +110,9 @@
 .tabbtn:hover{color:var(--heading);}
 .tabbtn.on{color:var(--heading);border-bottom-color:var(--accent);}
 .tabbadge{display:inline-block;min-width:18px;padding:1px 6px;margin-left:6px;border-radius:999px;background:var(--danger);color:#fff;font-size:11px;font-weight:700;text-align:center;}
-.docrow-actions{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;}
+.docrow-actions{display:flex;gap:8px;flex:0 1 auto;min-width:0;flex-wrap:wrap;}
+/* petit écran : les boutons passent sous le nom au lieu de déborder de l'écran */
+@media (max-width:640px){.docrow-actions{flex:1 1 100%;}}
 /* Vraie zone de dépôt (data-drop-upload, voir bindDnd()) → pointillés. */
 .doc-uploadbox{border:1.5px dashed var(--border);border-radius:8px;padding:14px 16px;margin-bottom:14px;background:var(--surface-2);display:flex;align-items:center;gap:14px;flex-wrap:wrap;transition:border-color .15s ease,background .15s ease;}
 .doc-uploadbox.drag-over{border-color:var(--accent);background:var(--blue-soft);}
@@ -128,9 +130,37 @@
 .reqrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:13px;}
 .reqrow .reqname{flex:1 1 200px;min-width:0;font-weight:600;overflow-wrap:anywhere;}
 .reqadd{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
-.reqadd select{flex:1 1 220px;width:auto;margin:0;}
-.reqadd input{flex:2 1 260px;width:auto;margin:0;}
+.reqadd select{flex:1 1 220px;width:auto;min-width:0;max-width:100%;margin:0;}
+.reqadd input{flex:2 1 260px;width:auto;min-width:0;max-width:100%;margin:0;}
 .reqadd .btn{flex-shrink:0;}
+
+/* --- DÉPÔT DES BILANS (onglet "Déposer les bilans" + onglet Bilans d'une fiche)
+   ⚠ LIÉ À renderReportingsSection(), renderReportPreviewHtml(),
+   renderReportPeriodFields() et renderBilansTab() dans lib/conseiller-app.js --- */
+.repstep{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px;}
+.repstep-title{font-weight:800;font-size:13.5px;color:var(--heading);margin-bottom:10px;}
+.repfields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}
+.repfields .field{margin-bottom:8px;}
+@media (max-width:640px){.repfields{grid-template-columns:1fr;}}
+.repdrop{border-radius:8px;padding:22px 16px;text-align:center;}
+.repdrop .import-sub{margin:0 auto;}
+.repsummary{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--text-muted);margin-bottom:10px;}
+.repsummary .ok{color:var(--success);font-weight:700;}
+.repsummary .warn{color:var(--danger);font-weight:700;}
+.replist{display:flex;flex-direction:column;gap:6px;max-height:520px;overflow-y:auto;padding-right:2px;}
+.reprow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:8px;padding:9px 12px;background:var(--surface);}
+.reprow[data-rep-status="ambiguous"],.reprow[data-rep-status="none"]{border-color:var(--danger);}
+.reprow[data-rep-status="duplicate"]{opacity:.65;}
+.repname{flex:1 1 240px;min-width:0;}
+.repname .fi-name{white-space:normal;overflow-wrap:anywhere;}
+.repclient{flex:0 0 280px;min-width:0;font-size:13px;}
+@media (max-width:700px){.repclient{flex:1 1 100%;}}
+.repclient select{margin:0;}
+.reprow .badge{flex:0 0 190px;text-align:center;}
+.repactions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px;}
+.repbox{flex-wrap:wrap;}
+.accchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.accchip{font-family:monospace;font-size:12.5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;}
 
 /* --- MESSAGERIE (⚠ LIÉ À renderMessagesTab()/renderThreadHtml() dans
    lib/conseiller-app.js ; mêmes classes que dans espace-client/index.html) --- */
